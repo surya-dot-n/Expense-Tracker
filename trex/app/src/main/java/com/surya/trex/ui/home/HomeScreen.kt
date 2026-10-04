@@ -1,3 +1,4 @@
+
 package com.surya.trex.ui.home
 
 import androidx.compose.foundation.background
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +37,8 @@ import com.surya.trex.data.model.CategorySummary
 import com.surya.trex.data.model.DashboardSummary
 import com.surya.trex.data.model.RecentTransaction
 import com.surya.trex.data.repository.DashboardRepository
+import com.surya.trex.data.repository.DashboardRefreshManager
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
@@ -98,18 +102,13 @@ fun HomeScreen(
         try {
 
             // -----------------------------------------
-            // Load dashboard summary
+            // Load all dashboard data
             // -----------------------------------------
 
             val summaryResult =
                 repository.getDashboardSummary()
 
-            if (summaryResult.isSuccess) {
-
-                summary = summaryResult.getOrNull()
-
-            } else {
-
+            if (summaryResult.isFailure) {
                 throw Exception(
                     "Failed to load balance: ${
                         summaryResult.exceptionOrNull()?.message
@@ -118,22 +117,10 @@ fun HomeScreen(
                 )
             }
 
-
-            // -----------------------------------------
-            // Load category summary
-            // -----------------------------------------
-
             val categoriesResult =
                 repository.getDashboardCategories()
 
-            if (categoriesResult.isSuccess) {
-
-                categorySummary =
-                    categoriesResult.getOrNull()
-                        ?: emptyList()
-
-            } else {
-
+            if (categoriesResult.isFailure) {
                 throw Exception(
                     "Failed to load spending overview: ${
                         categoriesResult.exceptionOrNull()?.message
@@ -142,22 +129,10 @@ fun HomeScreen(
                 )
             }
 
-
-            // -----------------------------------------
-            // Load recent transactions
-            // -----------------------------------------
-
             val recentResult =
                 repository.getRecentTransactions()
 
-            if (recentResult.isSuccess) {
-
-                recentTransactions =
-                    recentResult.getOrNull()
-                        ?: emptyList()
-
-            } else {
-
+            if (recentResult.isFailure) {
                 throw Exception(
                     "Failed to load recent transactions: ${
                         recentResult.exceptionOrNull()?.message
@@ -165,6 +140,22 @@ fun HomeScreen(
                     }"
                 )
             }
+
+            // -----------------------------------------
+            // Update HomeScreen only after all requests
+            // succeeded.
+            // -----------------------------------------
+
+            summary =
+                summaryResult.getOrNull()
+
+            categorySummary =
+                categoriesResult.getOrNull()
+                    ?: emptyList()
+
+            recentTransactions =
+                recentResult.getOrNull()
+                    ?: emptyList()
 
         } catch (e: Exception) {
 
@@ -189,6 +180,21 @@ fun HomeScreen(
         loadDashboard(
             showFullLoading = true
         )
+    }
+
+
+    // -----------------------------------------
+    // Live dashboard refresh events
+    // -----------------------------------------
+
+    LaunchedEffect(Unit) {
+
+        DashboardRefreshManager.refreshEvents.collect {
+
+            loadDashboard(
+                showFullLoading = false
+            )
+        }
     }
 
 
@@ -255,7 +261,7 @@ fun HomeScreen(
 
     Scaffold(
 
-        containerColor = Color(0xFFF7F9FC),
+        containerColor = MaterialTheme.colorScheme.background,
 
         floatingActionButton = {
 
@@ -281,10 +287,10 @@ fun HomeScreen(
                 },
 
                 containerColor =
-                    Color(0xFF2563EB),
+                    MaterialTheme.colorScheme.primary,
 
                 contentColor =
-                    Color.White,
+                    MaterialTheme.colorScheme.onPrimary,
 
                 shape =
                     RoundedCornerShape(18.dp)
@@ -338,7 +344,7 @@ fun HomeScreen(
                             CircleShape,
 
                         color =
-                            Color.White,
+                            MaterialTheme.colorScheme.surface,
 
                         shadowElevation =
                             3.dp
@@ -359,7 +365,7 @@ fun HomeScreen(
                                     "Profile",
 
                                 tint =
-                                    Color(0xFF2563EB)
+                                    MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -384,7 +390,7 @@ fun HomeScreen(
                             CircleShape,
 
                         color =
-                            Color.White,
+                            MaterialTheme.colorScheme.surface,
 
                         shadowElevation =
                             3.dp
@@ -405,7 +411,7 @@ fun HomeScreen(
                                     "Pending Transactions",
 
                                 tint =
-                                    Color(0xFF7C3AED)
+                                    MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
@@ -430,7 +436,7 @@ fun HomeScreen(
                             CircleShape,
 
                         color =
-                            Color.White,
+                            MaterialTheme.colorScheme.surface,
 
                         shadowElevation =
                             3.dp
@@ -465,7 +471,7 @@ fun HomeScreen(
                                         2.dp,
 
                                     color =
-                                        Color(0xFF2563EB)
+                                        MaterialTheme.colorScheme.primary
                                 )
 
                             } else {
@@ -479,7 +485,7 @@ fun HomeScreen(
                                         "Refresh",
 
                                     tint =
-                                        Color(0xFF2563EB)
+                                        MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -505,7 +511,7 @@ fun HomeScreen(
                             CircleShape,
 
                         color =
-                            Color.White,
+                            MaterialTheme.colorScheme.surface,
 
                         shadowElevation =
                             3.dp
@@ -529,7 +535,7 @@ fun HomeScreen(
                                     "Logout",
 
                                 tint =
-                                    Color(0xFF64748B)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -633,10 +639,10 @@ fun HomeScreen(
                                     Icons.Default.ArrowDownward,
 
                                 iconBackground =
-                                    Color(0xFFE8F8F0),
+                                    MaterialTheme.colorScheme.tertiaryContainer,
 
                                 iconColor =
-                                    Color(0xFF16A34A)
+                                    MaterialTheme.colorScheme.tertiary
                             )
 
 
@@ -655,10 +661,10 @@ fun HomeScreen(
                                     Icons.Default.ArrowUpward,
 
                                 iconBackground =
-                                    Color(0xFFFFECEC),
+                                    MaterialTheme.colorScheme.errorContainer,
 
                                 iconColor =
-                                    Color(0xFFDC2626)
+                                    MaterialTheme.colorScheme.error
                             )
                         }
                     }
@@ -701,7 +707,7 @@ fun HomeScreen(
                             colors =
                                 CardDefaults.cardColors(
                                     containerColor =
-                                        Color.White
+                                        MaterialTheme.colorScheme.surface
                                 ),
 
                             elevation =
@@ -732,7 +738,7 @@ fun HomeScreen(
                                             CircleShape,
 
                                         color =
-                                            Color(0xFFEFF6FF)
+                                            MaterialTheme.colorScheme.primaryContainer
                                     ) {
 
                                         Box(
@@ -750,7 +756,7 @@ fun HomeScreen(
                                                     null,
 
                                                 tint =
-                                                    Color(0xFF2563EB),
+                                                    MaterialTheme.colorScheme.primary,
 
                                                 modifier =
                                                     Modifier.size(22.dp)
@@ -788,7 +794,7 @@ fun HomeScreen(
                                                 12.sp,
 
                                             color =
-                                                Color(0xFF64748B)
+                                                MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -817,10 +823,10 @@ fun HomeScreen(
                                             ),
 
                                     color =
-                                        Color(0xFF2563EB),
+                                        MaterialTheme.colorScheme.primary,
 
                                     trackColor =
-                                        Color(0xFFE8EEF8)
+                                        MaterialTheme.colorScheme.primaryContainer
                                 )
 
 
@@ -860,7 +866,7 @@ fun HomeScreen(
                                             12.sp,
 
                                         color =
-                                            Color(0xFF64748B)
+                                            MaterialTheme.colorScheme.onSurfaceVariant
                                     )
 
 
@@ -889,11 +895,11 @@ fun HomeScreen(
                                                 data.balance >= 0
                                             ) {
 
-                                                Color(0xFF16A34A)
+                                                MaterialTheme.colorScheme.tertiary
 
                                             } else {
 
-                                                Color(0xFFDC2626)
+                                                MaterialTheme.colorScheme.error
                                             }
                                     )
                                 }
@@ -921,7 +927,7 @@ fun HomeScreen(
                             FontWeight.ExtraBold,
 
                         color =
-                            Color(0xFF0F172A)
+                            MaterialTheme.colorScheme.onBackground
                     )
                 }
 
@@ -994,7 +1000,7 @@ fun HomeScreen(
                                     FontWeight.ExtraBold,
 
                                 color =
-                                    Color(0xFF0F172A)
+                                    MaterialTheme.colorScheme.onBackground
                             )
 
                             Spacer(
@@ -1011,14 +1017,10 @@ fun HomeScreen(
                                     12.sp,
 
                                 color =
-                                    Color(0xFF94A3B8)
+                                    MaterialTheme.colorScheme.outline
                             )
                         }
 
-
-                        // --------------------------------------
-                        // View all transactions
-                        // --------------------------------------
 
                         TextButton(
 
@@ -1038,7 +1040,7 @@ fun HomeScreen(
                                     FontWeight.Bold,
 
                                 color =
-                                    Color(0xFF2563EB)
+                                    MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -1109,7 +1111,7 @@ fun HomeScreen(
                                 null,
 
                             tint =
-                                Color(0xFF2563EB),
+                                MaterialTheme.colorScheme.primary,
 
                             modifier =
                                 Modifier.size(24.dp)
@@ -1132,7 +1134,7 @@ fun HomeScreen(
                                 FontWeight.Medium,
 
                             color =
-                                Color(0xFF94A3B8)
+                                MaterialTheme.colorScheme.outline
                         )
                     }
                 }
@@ -1166,7 +1168,7 @@ private fun LoadingDashboard() {
         CircularProgressIndicator(
 
             color =
-                Color(0xFF2563EB),
+                MaterialTheme.colorScheme.primary,
 
             strokeWidth =
                 4.dp,
@@ -1192,7 +1194,7 @@ private fun LoadingDashboard() {
                 FontWeight.SemiBold,
 
             color =
-                Color(0xFF334155)
+                MaterialTheme.colorScheme.surfaceVariant
         )
 
         Spacer(
@@ -1209,7 +1211,7 @@ private fun LoadingDashboard() {
                 12.sp,
 
             color =
-                Color(0xFF94A3B8)
+                MaterialTheme.colorScheme.outline
         )
     }
 }
@@ -1236,7 +1238,7 @@ private fun DashboardError(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface
             ),
 
         elevation =
@@ -1266,7 +1268,7 @@ private fun DashboardError(
                     CircleShape,
 
                 color =
-                    Color(0xFFFFECEC)
+                    MaterialTheme.colorScheme.errorContainer
             ) {
 
                 Box(
@@ -1284,7 +1286,7 @@ private fun DashboardError(
                             null,
 
                         tint =
-                            Color(0xFFDC2626),
+                            MaterialTheme.colorScheme.error,
 
                         modifier =
                             Modifier.size(32.dp)
@@ -1311,7 +1313,7 @@ private fun DashboardError(
                     FontWeight.Bold,
 
                 color =
-                    Color(0xFF0F172A)
+                    MaterialTheme.colorScheme.onBackground
             )
 
 
@@ -1330,7 +1332,7 @@ private fun DashboardError(
                     13.sp,
 
                 color =
-                    Color(0xFF64748B),
+                    MaterialTheme.colorScheme.onSurfaceVariant,
 
                 textAlign =
                     androidx.compose.ui.text.style.TextAlign.Center
@@ -1354,7 +1356,7 @@ private fun DashboardError(
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor =
-                            Color(0xFF2563EB)
+                            MaterialTheme.colorScheme.primary
                     )
             ) {
 
@@ -1421,9 +1423,9 @@ private fun BalanceCard(
                         Brush.linearGradient(
                             colors =
                                 listOf(
-                                    Color(0xFF2563EB),
-                                    Color(0xFF1D4ED8),
-                                    Color(0xFF3730A3)
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.secondary
                                 )
                         )
                     )
@@ -1464,7 +1466,7 @@ private fun BalanceCard(
                                 1.2.sp,
 
                             color =
-                                Color.White.copy(
+                                MaterialTheme.colorScheme.surface.copy(
                                     alpha = 0.75f
                                 )
                         )
@@ -1488,7 +1490,7 @@ private fun BalanceCard(
                                 FontWeight.ExtraBold,
 
                             color =
-                                Color.White
+                                MaterialTheme.colorScheme.surface
                         )
                     }
 
@@ -1502,7 +1504,7 @@ private fun BalanceCard(
                             CircleShape,
 
                         color =
-                            Color.White.copy(
+                            MaterialTheme.colorScheme.surface.copy(
                                 alpha = 0.16f
                             )
                     ) {
@@ -1522,7 +1524,7 @@ private fun BalanceCard(
                                     null,
 
                                 tint =
-                                    Color.White,
+                                    MaterialTheme.colorScheme.onPrimary,
 
                                 modifier =
                                     Modifier.size(28.dp)
@@ -1541,7 +1543,7 @@ private fun BalanceCard(
                 HorizontalDivider(
 
                     color =
-                        Color.White.copy(
+                        MaterialTheme.colorScheme.surface.copy(
                             alpha = 0.18f
                         )
                 )
@@ -1619,7 +1621,7 @@ private fun WhiteBalanceItem(
                 CircleShape,
 
             color =
-                Color.White.copy(
+                MaterialTheme.colorScheme.surface.copy(
                     alpha = 0.15f
                 )
         ) {
@@ -1639,7 +1641,7 @@ private fun WhiteBalanceItem(
                         null,
 
                     tint =
-                        Color.White,
+                        MaterialTheme.colorScheme.onPrimary,
 
                     modifier =
                         Modifier.size(18.dp)
@@ -1665,7 +1667,7 @@ private fun WhiteBalanceItem(
                     11.sp,
 
                 color =
-                    Color.White.copy(
+                    MaterialTheme.colorScheme.surface.copy(
                         alpha = 0.72f
                     )
             )
@@ -1684,7 +1686,7 @@ private fun WhiteBalanceItem(
                     FontWeight.Bold,
 
                 color =
-                    Color.White
+                    MaterialTheme.colorScheme.surface
             )
         }
     }
@@ -1716,7 +1718,7 @@ private fun QuickStatCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface
             ),
 
         elevation =
@@ -1789,7 +1791,7 @@ private fun QuickStatCard(
                         13.sp,
 
                     color =
-                        Color(0xFF64748B),
+                        MaterialTheme.colorScheme.onSurfaceVariant,
 
                     fontWeight =
                         FontWeight.Medium
@@ -1817,7 +1819,7 @@ private fun QuickStatCard(
                     FontWeight.ExtraBold,
 
                 color =
-                    Color(0xFF0F172A),
+                    MaterialTheme.colorScheme.onBackground,
 
                 maxLines =
                     1,
@@ -1870,7 +1872,7 @@ private fun CategoryCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface
             ),
 
         elevation =
@@ -1904,7 +1906,7 @@ private fun CategoryCard(
                         CircleShape,
 
                     color =
-                        Color(0xFFEFF6FF)
+                        MaterialTheme.colorScheme.primaryContainer
                 ) {
 
                     Box(
@@ -1922,7 +1924,7 @@ private fun CategoryCard(
                                 null,
 
                             tint =
-                                Color(0xFF2563EB),
+                                MaterialTheme.colorScheme.primary,
 
                             modifier =
                                 Modifier.size(22.dp)
@@ -1955,7 +1957,7 @@ private fun CategoryCard(
                             FontWeight.Bold,
 
                         color =
-                            Color(0xFF0F172A)
+                            MaterialTheme.colorScheme.onBackground
                     )
 
 
@@ -1974,7 +1976,7 @@ private fun CategoryCard(
                             11.sp,
 
                         color =
-                            Color(0xFF94A3B8)
+                            MaterialTheme.colorScheme.outline
                     )
                 }
 
@@ -1993,7 +1995,7 @@ private fun CategoryCard(
                         FontWeight.ExtraBold,
 
                     color =
-                        Color(0xFF0F172A)
+                        MaterialTheme.colorScheme.onBackground
                 )
             }
 
@@ -2021,10 +2023,10 @@ private fun CategoryCard(
                         ),
 
                 color =
-                    Color(0xFF2563EB),
+                    MaterialTheme.colorScheme.primary,
 
                 trackColor =
-                    Color(0xFFE8EEF8)
+                    MaterialTheme.colorScheme.primaryContainer
             )
         }
     }
@@ -2053,11 +2055,11 @@ private fun TransactionCard(
 
         if (isIncome) {
 
-            Color(0xFF16A34A)
+            MaterialTheme.colorScheme.tertiary
 
         } else {
 
-            Color(0xFFDC2626)
+            MaterialTheme.colorScheme.error
         }
 
 
@@ -2065,11 +2067,11 @@ private fun TransactionCard(
 
         if (isIncome) {
 
-            Color(0xFFE8F8F0)
+            MaterialTheme.colorScheme.tertiaryContainer
 
         } else {
 
-            Color(0xFFFFECEC)
+            MaterialTheme.colorScheme.errorContainer
         }
 
 
@@ -2084,7 +2086,7 @@ private fun TransactionCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface
             ),
 
         elevation =
@@ -2177,7 +2179,7 @@ private fun TransactionCard(
                         FontWeight.SemiBold,
 
                     color =
-                        Color(0xFF0F172A),
+                        MaterialTheme.colorScheme.onBackground,
 
                     maxLines =
                         1,
@@ -2199,7 +2201,7 @@ private fun TransactionCard(
                         RoundedCornerShape(7.dp),
 
                     color =
-                        Color(0xFFF1F5F9)
+                        MaterialTheme.colorScheme.surfaceVariant
                 ) {
 
                     Text(
@@ -2224,7 +2226,7 @@ private fun TransactionCard(
                             FontWeight.Medium,
 
                         color =
-                            Color(0xFF64748B)
+                            MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -2289,7 +2291,7 @@ private fun EmptyCard(
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface
             ),
 
         elevation =
@@ -2319,7 +2321,7 @@ private fun EmptyCard(
                     CircleShape,
 
                 color =
-                    Color(0xFFEFF6FF)
+                    MaterialTheme.colorScheme.primaryContainer
             ) {
 
                 Box(
@@ -2337,7 +2339,7 @@ private fun EmptyCard(
                             null,
 
                         tint =
-                            Color(0xFF2563EB),
+                            MaterialTheme.colorScheme.primary,
 
                         modifier =
                             Modifier.size(28.dp)
@@ -2364,7 +2366,7 @@ private fun EmptyCard(
                     FontWeight.Bold,
 
                 color =
-                    Color(0xFF0F172A)
+                    MaterialTheme.colorScheme.onBackground
             )
 
 
@@ -2383,7 +2385,7 @@ private fun EmptyCard(
                     12.sp,
 
                 color =
-                    Color(0xFF94A3B8)
+                    MaterialTheme.colorScheme.outline
             )
         }
     }

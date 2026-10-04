@@ -1,4 +1,3 @@
-
 package com.surya.trex.ui.transaction
 
 import androidx.compose.foundation.background
@@ -8,55 +7,62 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.surya.trex.data.local.TokenManager
-import com.surya.trex.data.model.Category
 import com.surya.trex.data.model.Transaction
-import com.surya.trex.data.repository.CategoryRepository
 import com.surya.trex.data.repository.TransactionRepository
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
     tokenManager: TokenManager,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onEditTransaction: (Transaction) -> Unit
 ) {
+
+    // ==========================================================
+    // REPOSITORY
+    // ==========================================================
+
+    val transactionRepository =
+        remember {
+            TransactionRepository(tokenManager)
+        }
+
+    val scope =
+        rememberCoroutineScope()
+
+
+    // ==========================================================
+    // STATE
+    // ==========================================================
 
     var transactions by remember {
         mutableStateOf<List<Transaction>>(emptyList())
     }
 
-    var categories by remember {
-        mutableStateOf<List<Category>>(emptyList())
-    }
-
     var isLoading by remember {
         mutableStateOf(true)
-    }
-
-    var isRefreshing by remember {
-        mutableStateOf(false)
     }
 
     var errorMessage by remember {
@@ -71,87 +77,41 @@ fun TransactionsScreen(
         mutableStateOf("All")
     }
 
-    val transactionRepository =
-        remember {
-            TransactionRepository(tokenManager)
-        }
+    var transactionToDelete by remember {
+        mutableStateOf<Transaction?>(null)
+    }
 
-    val categoryRepository =
-        remember {
-            CategoryRepository(tokenManager)
-        }
-
-    val scope =
-        rememberCoroutineScope()
+    var isDeleting by remember {
+        mutableStateOf(false)
+    }
 
 
     // ==========================================================
     // LOAD TRANSACTIONS
     // ==========================================================
 
-    suspend fun loadTransactions(
-        showFullLoading: Boolean = false
-    ) {
+    fun loadTransactions() {
 
-        if (showFullLoading) {
+        scope.launch {
+
             isLoading = true
-        } else {
-            isRefreshing = true
-        }
+            errorMessage = null
 
-        errorMessage = null
+            transactionRepository
+                .getTransactions()
+                .onSuccess {
 
-        try {
+                    transactions = it
 
-            val transactionResult =
-                transactionRepository.getTransactions()
+                }
+                .onFailure {
 
-            if (transactionResult.isSuccess) {
-
-                transactions =
-                    transactionResult.getOrNull()
-                        ?: emptyList()
-
-            } else {
-
-                throw Exception(
-                    transactionResult
-                        .exceptionOrNull()
-                        ?.message
-                        ?: "Unable to load transactions"
-                )
-            }
-
-
-            val categoryResult =
-                categoryRepository.getCategories()
-
-            if (categoryResult.isSuccess) {
-
-                categories =
-                    categoryResult.getOrNull()
-                        ?: emptyList()
-
-            } else {
-
-                throw Exception(
-                    categoryResult
-                        .exceptionOrNull()
-                        ?.message
-                        ?: "Unable to load categories"
-                )
-            }
-
-        } catch (e: Exception) {
-
-            errorMessage =
-                e.message
-                    ?: "Something went wrong"
-
-        } finally {
+                    errorMessage =
+                        it.message
+                            ?: "Failed to load transactions"
+                }
 
             isLoading = false
-            isRefreshing = false
         }
     }
 
@@ -161,83 +121,8 @@ fun TransactionsScreen(
     // ==========================================================
 
     LaunchedEffect(Unit) {
-
-        loadTransactions(
-            showFullLoading = true
-        )
+        loadTransactions()
     }
-
-
-    // ==========================================================
-    // FILTER TRANSACTIONS
-    // ==========================================================
-
-    val filteredTransactions =
-        remember(
-            transactions,
-            searchQuery,
-            selectedFilter
-        ) {
-
-            transactions.filter { transaction ->
-
-                val matchesType =
-                    when (selectedFilter) {
-
-                        "Expense" ->
-                            transaction.transaction_type
-                                .equals(
-                                    "expense",
-                                    ignoreCase = true
-                                )
-
-                        "Income" ->
-                            transaction.transaction_type
-                                .equals(
-                                    "income",
-                                    ignoreCase = true
-                                )
-
-                        else ->
-                            true
-                    }
-
-
-                val categoryName =
-                    categories
-                        .find {
-                            it.id ==
-                                    transaction.category_id
-                        }
-                        ?.category_name
-                        ?: ""
-
-
-                val searchText =
-                    listOf(
-                        transaction.description ?: "",
-                        categoryName,
-                        transaction.transaction_type
-                    )
-                        .joinToString(" ")
-                        .lowercase()
-
-
-                val matchesSearch =
-                    searchQuery
-                        .trim()
-                        .lowercase()
-                        .let { query ->
-
-                            query.isEmpty() ||
-                                    searchText.contains(query)
-                        }
-
-
-                matchesType &&
-                        matchesSearch
-            }
-        }
 
 
     // ==========================================================
@@ -245,7 +130,7 @@ fun TransactionsScreen(
     // ==========================================================
 
     val totalIncome =
-        filteredTransactions
+        transactions
             .filter {
                 it.transaction_type.equals(
                     "income",
@@ -256,9 +141,8 @@ fun TransactionsScreen(
                 it.amount
             }
 
-
     val totalExpense =
-        filteredTransactions
+        transactions
             .filter {
                 it.transaction_type.equals(
                     "expense",
@@ -271,122 +155,280 @@ fun TransactionsScreen(
 
 
     // ==========================================================
+    // FILTER TRANSACTIONS
+    // ==========================================================
+
+    val filteredTransactions =
+        transactions.filter { transaction ->
+
+            val matchesSearch =
+                searchQuery.isBlank() ||
+                        transaction.description
+                            ?.contains(
+                                searchQuery,
+                                ignoreCase = true
+                            ) == true
+
+            val matchesType =
+                when (selectedFilter) {
+
+                    "Income" ->
+                        transaction.transaction_type
+                            .equals(
+                                "income",
+                                ignoreCase = true
+                            )
+
+                    "Expense" ->
+                        transaction.transaction_type
+                            .equals(
+                                "expense",
+                                ignoreCase = true
+                            )
+
+                    else -> true
+                }
+
+            matchesSearch && matchesType
+        }
+
+
+    // ==========================================================
+    // DELETE DIALOG
+    // ==========================================================
+
+    transactionToDelete?.let { transaction ->
+
+        AlertDialog(
+
+            onDismissRequest = {
+
+                if (!isDeleting) {
+                    transactionToDelete = null
+                }
+            },
+
+            icon = {
+
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            MaterialTheme.colorScheme.errorContainer,
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+
+            title = {
+
+                Text(
+                    text = "Delete Transaction",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+
+            text = {
+
+                Text(
+                    text =
+                        "Are you sure you want to delete this transaction? This action cannot be undone.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+
+            confirmButton = {
+
+                Button(
+
+                    enabled = !isDeleting,
+
+                    onClick = {
+
+                        val transactionId =
+                            transaction.id
+
+                        if (transactionId == null) {
+                            transactionToDelete = null
+                            return@Button
+                        }
+
+                        scope.launch {
+
+                            isDeleting = true
+
+                            transactionRepository
+                                .deleteTransaction(
+                                    transactionId
+                                )
+                                .onSuccess {
+
+                                    transactionToDelete = null
+
+                                    loadTransactions()
+                                }
+                                .onFailure {
+
+                                    errorMessage =
+                                        it.message
+                                            ?: "Failed to delete transaction"
+
+                                    transactionToDelete = null
+                                }
+
+                            isDeleting = false
+                        }
+                    },
+
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor =
+                                MaterialTheme.colorScheme.error
+                        ),
+
+                    shape =
+                        RoundedCornerShape(10.dp)
+                ) {
+
+                    if (isDeleting) {
+
+                        CircularProgressIndicator(
+                            modifier =
+                                Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            strokeWidth = 2.dp
+                        )
+
+                    } else {
+
+                        Text(
+                            "Delete",
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+                    }
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+
+                    enabled = !isDeleting,
+
+                    onClick = {
+                        transactionToDelete = null
+                    }
+                ) {
+
+                    Text(
+                        "Cancel",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        )
+    }
+
+
+    // ==========================================================
     // SCREEN
     // ==========================================================
 
     Scaffold(
 
         containerColor =
-            Color(0xFFF7F9FC),
+            MaterialTheme.colorScheme.background,
 
         topBar = {
 
             Surface(
-                color = Color.White,
+                color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 2.dp
             ) {
 
-                Row(
+                Column {
 
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(
-                                horizontal = 8.dp,
-                                vertical = 8.dp
-                            ),
+                    // ==================================================
+                    // HEADER
+                    // ==================================================
 
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
+                    Row(
 
-                    IconButton(
-                        onClick = onBack
-                    ) {
-
-                        Icon(
-                            imageVector =
-                                Icons.Default.ArrowBack,
-
-                            contentDescription =
-                                "Back",
-
-                            tint =
-                                Color(0xFF0F172A)
-                        )
-                    }
-
-
-                    Column(
                         modifier =
-                            Modifier.weight(1f)
+                            Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(
+                                    horizontal = 8.dp,
+                                    vertical = 8.dp
+                                ),
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
                     ) {
 
-                        Text(
-
-                            text =
-                                "Transactions",
-
-                            fontSize =
-                                22.sp,
-
-                            fontWeight =
-                                FontWeight.ExtraBold,
-
-                            color =
-                                Color(0xFF0F172A)
-                        )
-
-                        Text(
-
-                            text =
-                                "Your complete financial activity",
-
-                            fontSize =
-                                12.sp,
-
-                            color =
-                                Color(0xFF94A3B8)
-                        )
-                    }
-
-
-                    IconButton(
-
-                        enabled =
-                            !isRefreshing,
-
-                        onClick = {
-
-                            scope.launch {
-
-                                loadTransactions(
-                                    showFullLoading =
-                                        false
-                                )
-                            }
-                        }
-                    ) {
-
-                        if (isRefreshing) {
-
-                            CircularProgressIndicator(
-
-                                modifier =
-                                    Modifier.size(20.dp),
-
-                                strokeWidth =
-                                    2.dp,
-
-                                color =
-                                    Color(0xFF2563EB)
-                            )
-
-                        } else {
+                        IconButton(
+                            onClick = onBack
+                        ) {
 
                             Icon(
+                                imageVector =
+                                    Icons.Default.Close,
 
+                                contentDescription =
+                                    "Back",
+
+                                tint =
+                                    MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+
+                        Column(
+                            modifier =
+                                Modifier.weight(1f)
+                        ) {
+
+                            Text(
+                                text = "Transactions",
+
+                                fontSize = 21.sp,
+
+                                fontWeight =
+                                    FontWeight.ExtraBold,
+
+                                color =
+                                    MaterialTheme.colorScheme.onBackground
+                            )
+
+                            Text(
+                                text =
+                                    "${transactions.size} transaction${if (transactions.size == 1) "" else "s"}",
+
+                                fontSize = 12.sp,
+
+                                color =
+                                    MaterialTheme.colorScheme.outline
+                            )
+                        }
+
+
+                        IconButton(
+                            onClick = {
+                                loadTransactions()
+                            }
+                        ) {
+
+                            Icon(
                                 imageVector =
                                     Icons.Default.Refresh,
 
@@ -394,296 +436,521 @@ fun TransactionsScreen(
                                     "Refresh",
 
                                 tint =
-                                    Color(0xFF2563EB)
+                                    MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+
+                        Box(
+
+                            modifier =
+                                Modifier
+                                    .size(42.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        CircleShape
+                                    ),
+
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+
+                            Icon(
+                                imageVector =
+                                    Icons.Default.ReceiptLong,
+
+                                contentDescription =
+                                    null,
+
+                                tint =
+                                    MaterialTheme.colorScheme.primary
                             )
                         }
                     }
+
+
+                    // ==================================================
+                    // SUMMARY
+                    // ==================================================
+
+                    Row(
+
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = 18.dp
+                                ),
+
+                        horizontalArrangement =
+                            Arrangement.spacedBy(10.dp)
+                    ) {
+
+                        TransactionSummaryCard(
+                            title = "Income",
+                            amount = totalIncome,
+                            amountColor =
+                                MaterialTheme.colorScheme.tertiary,
+                            backgroundColor =
+                                MaterialTheme.colorScheme.tertiaryContainer,
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+
+
+                        TransactionSummaryCard(
+                            title = "Expense",
+                            amount = totalExpense,
+                            amountColor =
+                                MaterialTheme.colorScheme.error,
+                            backgroundColor =
+                                MaterialTheme.colorScheme.errorContainer,
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+                    }
+
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(14.dp)
+                    )
+
+
+                    // ==================================================
+                    // SEARCH
+                    // ==================================================
+
+                    OutlinedTextField(
+
+                        value =
+                            searchQuery,
+
+                        onValueChange = {
+                            searchQuery = it
+                        },
+
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = 18.dp
+                                ),
+
+                        placeholder = {
+                            Text(
+                                "Search transactions..."
+                            )
+                        },
+
+                        leadingIcon = {
+
+                            Icon(
+                                imageVector =
+                                    Icons.Default.Search,
+
+                                contentDescription =
+                                    "Search",
+
+                                tint =
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+
+                        singleLine = true,
+
+                        shape =
+                            RoundedCornerShape(16.dp),
+
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+
+                                unfocusedContainerColor =
+                                    MaterialTheme.colorScheme.surfaceVariant,
+
+                                focusedContainerColor =
+                                    MaterialTheme.colorScheme.surfaceVariant,
+
+                                unfocusedBorderColor =
+                                    MaterialTheme.colorScheme.outline,
+
+                                focusedBorderColor =
+                                    MaterialTheme.colorScheme.primary
+                            )
+                    )
+
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(12.dp)
+                    )
+
+
+                    // ==================================================
+                    // FILTERS
+                    // ==================================================
+
+                    Row(
+
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = 18.dp
+                                ),
+
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
+                    ) {
+
+                        TransactionFilterChip(
+                            text = "All",
+                            selected =
+                                selectedFilter == "All",
+                            onClick = {
+                                selectedFilter = "All"
+                            }
+                        )
+
+                        TransactionFilterChip(
+                            text = "Income",
+                            selected =
+                                selectedFilter == "Income",
+                            onClick = {
+                                selectedFilter = "Income"
+                            }
+                        )
+
+                        TransactionFilterChip(
+                            text = "Expense",
+                            selected =
+                                selectedFilter == "Expense",
+                            onClick = {
+                                selectedFilter = "Expense"
+                            }
+                        )
+                    }
+
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(14.dp)
+                    )
                 }
             }
         }
 
-    ) { innerPadding ->
+    ) { paddingValues ->
 
-
-        LazyColumn(
+        Box(
 
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-
-            contentPadding =
-                PaddingValues(
-                    start = 18.dp,
-                    end = 18.dp,
-                    top = 18.dp,
-                    bottom = 30.dp
-                ),
-
-            verticalArrangement =
-                Arrangement.spacedBy(14.dp)
+                    .padding(paddingValues)
         ) {
 
+            when {
 
-            // ==================================================
-            // SUMMARY
-            // ==================================================
+                // ==================================================
+                // LOADING
+                // ==================================================
 
-            if (!isLoading && errorMessage == null) {
+                isLoading -> {
 
-                item {
+                    CircularProgressIndicator(
 
-                    TransactionSummaryCard(
+                        modifier =
+                            Modifier.align(
+                                Alignment.Center
+                            ),
 
-                        transactionCount =
-                            filteredTransactions.size,
-
-                        totalIncome =
-                            totalIncome,
-
-                        totalExpense =
-                            totalExpense
+                        color =
+                            MaterialTheme.colorScheme.primary
                     )
                 }
-            }
 
 
-            // ==================================================
-            // SEARCH
-            // ==================================================
+                // ==================================================
+                // ERROR
+                // ==================================================
 
-            item {
+                errorMessage != null -> {
 
-                OutlinedTextField(
+                    Column(
 
-                    value =
-                        searchQuery,
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.Center
+                                )
+                                .padding(24.dp),
 
-                    onValueChange = {
-                        searchQuery = it
-                    },
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally
+                    ) {
 
-                    modifier =
-                        Modifier.fillMaxWidth(),
+                        Box(
 
-                    singleLine = true,
+                            modifier =
+                                Modifier
+                                    .size(64.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.errorContainer,
+                                        CircleShape
+                                    ),
 
-                    placeholder = {
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+
+                            Icon(
+                                imageVector =
+                                    Icons.Default.ReceiptLong,
+
+                                contentDescription =
+                                    null,
+
+                                tint =
+                                    MaterialTheme.colorScheme.error,
+
+                                modifier =
+                                    Modifier.size(30.dp)
+                            )
+                        }
+
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(14.dp)
+                        )
+
 
                         Text(
                             text =
-                                "Search transactions..."
+                                errorMessage
+                                    ?: "Something went wrong",
+
+                            color =
+                                MaterialTheme.colorScheme.error,
+
+                            fontSize =
+                                14.sp,
+
+                            fontWeight =
+                                FontWeight.Medium
                         )
-                    },
 
-                    leadingIcon = {
 
-                        Icon(
-                            imageVector =
-                                Icons.Default.Search,
-
-                            contentDescription =
-                                null
+                        Spacer(
+                            modifier =
+                                Modifier.height(12.dp)
                         )
-                    },
 
-                    trailingIcon = {
 
-                        if (searchQuery.isNotEmpty()) {
+                        Button(
+                            onClick =
+                                {
+                                    loadTransactions()
+                                },
 
-                            IconButton(
-                                onClick = {
-                                    searchQuery = ""
-                                }
-                            ) {
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor =
+                                        MaterialTheme.colorScheme.primary
+                                ),
 
-                                Icon(
-                                    imageVector =
-                                        Icons.Default.Clear,
+                            shape =
+                                RoundedCornerShape(12.dp)
+                        ) {
 
-                                    contentDescription =
-                                        "Clear search"
-                                )
-                            }
+                            Icon(
+                                imageVector =
+                                    Icons.Default.Refresh,
+
+                                contentDescription =
+                                    null,
+
+                                modifier =
+                                    Modifier.size(18.dp)
+                            )
+
+                            Spacer(
+                                modifier =
+                                    Modifier.width(6.dp)
+                            )
+
+                            Text("Try Again")
                         }
-                    },
-
-                    shape =
-                        RoundedCornerShape(16.dp),
-
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor =
-                                Color(0xFF2563EB),
-
-                            unfocusedBorderColor =
-                                Color(0xFFE2E8F0),
-
-                            focusedContainerColor =
-                                Color.White,
-
-                            unfocusedContainerColor =
-                                Color.White
-                        )
-                )
-            }
-
-
-            // ==================================================
-            // FILTERS
-            // ==================================================
-
-            item {
-
-                Row(
-
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement.spacedBy(8.dp)
-                ) {
-
-                    TransactionFilterChip(
-                        text = "All",
-                        selected =
-                            selectedFilter == "All",
-                        onClick = {
-                            selectedFilter = "All"
-                        }
-                    )
-
-                    TransactionFilterChip(
-                        text = "Expense",
-                        selected =
-                            selectedFilter == "Expense",
-                        onClick = {
-                            selectedFilter = "Expense"
-                        }
-                    )
-
-                    TransactionFilterChip(
-                        text = "Income",
-                        selected =
-                            selectedFilter == "Income",
-                        onClick = {
-                            selectedFilter = "Income"
-                        }
-                    )
-                }
-            }
-
-
-            // ==================================================
-            // LOADING
-            // ==================================================
-
-            if (isLoading) {
-
-                item {
-
-                    TransactionsLoading()
-                }
-            }
-
-
-            // ==================================================
-            // ERROR
-            // ==================================================
-
-            else if (errorMessage != null) {
-
-                item {
-
-                    TransactionsError(
-
-                        message =
-                            errorMessage
-                                ?: "Unable to load transactions",
-
-                        onRetry = {
-
-                            scope.launch {
-
-                                loadTransactions(
-                                    showFullLoading =
-                                        true
-                                )
-                            }
-                        }
-                    )
-                }
-            }
-
-
-            // ==================================================
-            // EMPTY
-            // ==================================================
-
-            else if (filteredTransactions.isEmpty()) {
-
-                item {
-
-                    EmptyTransactions()
-                }
-            }
-
-
-            // ==================================================
-            // TRANSACTIONS
-            // ==================================================
-
-            else {
-
-                item {
-
-                    Text(
-
-                        text =
-                            "${filteredTransactions.size} transaction${
-                                if (
-                                    filteredTransactions.size != 1
-                                ) "s"
-                                else ""
-                            }",
-
-                        fontSize =
-                            14.sp,
-
-                        fontWeight =
-                            FontWeight.SemiBold,
-
-                        color =
-                            Color(0xFF64748B)
-                    )
-                }
-
-
-                items(
-
-                    items =
-                        filteredTransactions,
-
-                    key = {
-                        it.id ?: 0
                     }
+                }
 
-                ) { transaction ->
 
-                    TransactionListCard(
+                // ==================================================
+                // EMPTY
+                // ==================================================
 
-                        transaction =
-                            transaction,
+                filteredTransactions.isEmpty() -> {
 
-                        categoryName =
-                            categories
-                                .find {
-                                    it.id ==
-                                            transaction.category_id
+                    Column(
+
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.Center
+                                )
+                                .padding(24.dp),
+
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally
+                    ) {
+
+                        Box(
+
+                            modifier =
+                                Modifier
+                                    .size(74.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        CircleShape
+                                    ),
+
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+
+                            Icon(
+                                imageVector =
+                                    Icons.Default.ReceiptLong,
+
+                                contentDescription =
+                                    null,
+
+                                tint =
+                                    MaterialTheme.colorScheme.primary,
+
+                                modifier =
+                                    Modifier.size(34.dp)
+                            )
+                        }
+
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(16.dp)
+                        )
+
+
+                        Text(
+                            text =
+                                if (
+                                    searchQuery.isNotBlank() ||
+                                    selectedFilter != "All"
+                                ) {
+                                    "No matching transactions"
+                                } else {
+                                    "No transactions yet"
+                                },
+
+                            fontSize =
+                                18.sp,
+
+                            fontWeight =
+                                FontWeight.Bold,
+
+                            color =
+                                MaterialTheme.colorScheme.onBackground
+                        )
+
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(6.dp)
+                        )
+
+
+                        Text(
+                            text =
+                                if (
+                                    searchQuery.isNotBlank() ||
+                                    selectedFilter != "All"
+                                ) {
+                                    "Try changing your search or filter"
+                                } else {
+                                    "Your transactions will appear here"
+                                },
+
+                            fontSize =
+                                13.sp,
+
+                            color =
+                                MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+
+
+                // ==================================================
+                // TRANSACTION LIST
+                // ==================================================
+
+                else -> {
+
+                    LazyColumn(
+
+                        modifier =
+                            Modifier.fillMaxSize(),
+
+                        contentPadding =
+                            PaddingValues(
+                                horizontal = 18.dp,
+                                vertical = 16.dp
+                            ),
+
+                        verticalArrangement =
+                            Arrangement.spacedBy(12.dp)
+                    ) {
+
+                        items(
+
+                            items =
+                                filteredTransactions,
+
+                            key = {
+                                it.id ?: 0
+                            }
+
+                        ) { transaction ->
+
+                            TransactionListCard(
+
+                                transaction =
+                                    transaction,
+
+                                onEdit = {
+
+                                    onEditTransaction(
+                                        transaction
+                                    )
+                                },
+
+                                onDelete = {
+
+                                    transactionToDelete =
+                                        transaction
                                 }
-                                ?.category_name
-                                ?: "Other"
-                    )
+                            )
+                        }
+
+
+                        item {
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -697,197 +964,30 @@ fun TransactionsScreen(
 
 @Composable
 private fun TransactionSummaryCard(
-    transactionCount: Int,
-    totalIncome: Double,
-    totalExpense: Double
+    title: String,
+    amount: Double,
+    amountColor: Color,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier
 ) {
 
     Card(
 
-        modifier =
-            Modifier.fillMaxWidth(),
-
-        shape =
-            RoundedCornerShape(24.dp),
-
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    Color.White
-            ),
-
-        elevation =
-            CardDefaults.cardElevation(
-                defaultElevation =
-                    3.dp
-            )
-    ) {
-
-        Column(
-
-            modifier =
-                Modifier.padding(20.dp)
-        ) {
-
-            Row(
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                Surface(
-
-                    modifier =
-                        Modifier.size(44.dp),
-
-                    shape =
-                        CircleShape,
-
-                    color =
-                        Color(0xFFEFF6FF)
-                ) {
-
-                    Box(
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-
-                        Icon(
-
-                            imageVector =
-                                Icons.Default.ReceiptLong,
-
-                            contentDescription =
-                                null,
-
-                            tint =
-                                Color(0xFF2563EB),
-
-                            modifier =
-                                Modifier.size(23.dp)
-                        )
-                    }
-                }
-
-
-                Spacer(
-                    modifier =
-                        Modifier.width(12.dp)
-                )
-
-
-                Column {
-
-                    Text(
-
-                        text =
-                            "Transaction overview",
-
-                        fontSize =
-                            16.sp,
-
-                        fontWeight =
-                            FontWeight.Bold,
-
-                        color =
-                            Color(0xFF0F172A)
-                    )
-
-                    Text(
-
-                        text =
-                            "$transactionCount recorded",
-
-                        fontSize =
-                            12.sp,
-
-                        color =
-                            Color(0xFF94A3B8)
-                    )
-                }
-            }
-
-
-            Spacer(
-                modifier =
-                    Modifier.height(18.dp)
-            )
-
-
-            Row(
-
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(10.dp)
-            ) {
-
-                SummaryAmount(
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    title =
-                        "Income",
-
-                    amount =
-                        totalIncome,
-
-                    color =
-                        Color(0xFF16A34A),
-
-                    background =
-                        Color(0xFFE8F8F0)
-                )
-
-
-                SummaryAmount(
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    title =
-                        "Expense",
-
-                    amount =
-                        totalExpense,
-
-                    color =
-                        Color(0xFFDC2626),
-
-                    background =
-                        Color(0xFFFFECEC)
-                )
-            }
-        }
-    }
-}
-
-
-// ==========================================================
-// SUMMARY AMOUNT
-// ==========================================================
-
-@Composable
-private fun SummaryAmount(
-    modifier: Modifier,
-    title: String,
-    amount: Double,
-    color: Color,
-    background: Color
-) {
-
-    Surface(
-
-        modifier =
-            modifier,
+        modifier = modifier,
 
         shape =
             RoundedCornerShape(16.dp),
 
-        color =
-            background
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    backgroundColor
+            ),
+
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = 0.dp
+            )
     ) {
 
         Column(
@@ -897,44 +997,36 @@ private fun SummaryAmount(
         ) {
 
             Text(
+                text = title,
 
-                text =
-                    title,
-
-                fontSize =
-                    11.sp,
+                fontSize = 12.sp,
 
                 fontWeight =
                     FontWeight.Medium,
 
                 color =
-                    color
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
+
 
             Spacer(
                 modifier =
-                    Modifier.height(5.dp)
+                    Modifier.height(4.dp)
             )
+
 
             Text(
 
                 text =
-                    "₹%.2f".format(amount),
+                    "₹${"%.2f".format(amount)}",
 
-                fontSize =
-                    17.sp,
+                fontSize = 18.sp,
 
                 fontWeight =
                     FontWeight.ExtraBold,
 
                 color =
-                    color,
-
-                maxLines =
-                    1,
-
-                overflow =
-                    TextOverflow.Ellipsis
+                    amountColor
             )
         }
     }
@@ -963,16 +1055,34 @@ private fun TransactionFilterChip(
         label = {
 
             Text(
-                text =
-                    text,
+                text = text,
+
+                fontSize = 12.sp,
 
                 fontWeight =
-                    if (selected)
-                        FontWeight.Bold
-                    else
-                        FontWeight.Medium
+                    FontWeight.Bold
             )
         },
+
+        leadingIcon =
+            if (selected) {
+
+                {
+                    Icon(
+                        imageVector =
+                            Icons.Default.Tune,
+
+                        contentDescription =
+                            null,
+
+                        modifier =
+                            Modifier.size(15.dp)
+                    )
+                }
+
+            } else {
+                null
+            },
 
         shape =
             RoundedCornerShape(12.dp),
@@ -981,16 +1091,31 @@ private fun TransactionFilterChip(
             FilterChipDefaults.filterChipColors(
 
                 selectedContainerColor =
-                    Color(0xFF2563EB),
+                    MaterialTheme.colorScheme.primaryContainer,
 
                 selectedLabelColor =
-                    Color.White,
+                    MaterialTheme.colorScheme.primary,
+
+                selectedLeadingIconColor =
+                    MaterialTheme.colorScheme.primary,
 
                 containerColor =
-                    Color.White,
+                    MaterialTheme.colorScheme.surface,
 
                 labelColor =
-                    Color(0xFF64748B)
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+
+        border =
+            FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = selected,
+                borderColor =
+                    MaterialTheme.colorScheme.outline,
+                selectedBorderColor =
+                    MaterialTheme.colorScheme.primary,
+                borderWidth = 1.dp,
+                selectedBorderWidth = 1.dp
             )
     )
 }
@@ -1003,7 +1128,8 @@ private fun TransactionFilterChip(
 @Composable
 private fun TransactionListCard(
     transaction: Transaction,
-    categoryName: String
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
 
     val isIncome =
@@ -1014,77 +1140,65 @@ private fun TransactionListCard(
             )
 
 
-    val iconColor =
-        if (isIncome) {
-
-            Color(0xFF16A34A)
-
-        } else {
-
-            Color(0xFFDC2626)
-        }
-
-
-    val iconBackground =
-        if (isIncome) {
-
-            Color(0xFFE8F8F0)
-
-        } else {
-
-            Color(0xFFFFECEC)
-        }
-
-
     Card(
 
         modifier =
             Modifier.fillMaxWidth(),
 
         shape =
-            RoundedCornerShape(20.dp),
+            RoundedCornerShape(18.dp),
 
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    Color.White
+                    MaterialTheme.colorScheme.surface
             ),
 
         elevation =
             CardDefaults.cardElevation(
                 defaultElevation =
-                    2.dp
+                    1.dp
             )
     ) {
 
-        Row(
+        Column(
 
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(17.dp),
-
-            verticalAlignment =
-                Alignment.CenterVertically
+                    .padding(16.dp)
         ) {
 
-            // ------------------------------------------
-            // ICON
-            // ------------------------------------------
-
-            Surface(
+            Row(
 
                 modifier =
-                    Modifier.size(48.dp),
+                    Modifier.fillMaxWidth(),
 
-                shape =
-                    CircleShape,
-
-                color =
-                    iconBackground
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
 
+                // ==================================================
+                // ICON
+                // ==================================================
+
                 Box(
+
+                    modifier =
+                        Modifier
+                            .size(44.dp)
+                            .background(
+
+                                color =
+                                    if (isIncome) {
+                                        MaterialTheme.colorScheme.tertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.errorContainer
+                                    },
+
+                                shape =
+                                    CircleShape
+                            ),
 
                     contentAlignment =
                         Alignment.Center
@@ -1093,165 +1207,68 @@ private fun TransactionListCard(
                     Icon(
 
                         imageVector =
-                            if (isIncome) {
-
-                                Icons.Default.ArrowDownward
-
-                            } else {
-
-                                Icons.Default.ArrowUpward
-                            },
+                            Icons.Default.ReceiptLong,
 
                         contentDescription =
                             null,
 
                         tint =
-                            iconColor,
+                            if (isIncome) {
+                                MaterialTheme.colorScheme.tertiary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
 
                         modifier =
-                            Modifier.size(22.dp)
+                            Modifier.size(21.dp)
                     )
                 }
-            }
-
-
-            Spacer(
-                modifier =
-                    Modifier.width(13.dp)
-            )
-
-
-            // ------------------------------------------
-            // DETAILS
-            // ------------------------------------------
-
-            Column(
-
-                modifier =
-                    Modifier.weight(1f)
-            ) {
-
-                Text(
-
-                    text =
-                        transaction.description
-                            ?.ifBlank {
-                                "Transaction"
-                            }
-                            ?: "Transaction",
-
-                    fontSize =
-                        15.sp,
-
-                    fontWeight =
-                        FontWeight.Bold,
-
-                    color =
-                        Color(0xFF0F172A),
-
-                    maxLines =
-                        1,
-
-                    overflow =
-                        TextOverflow.Ellipsis
-                )
 
 
                 Spacer(
                     modifier =
-                        Modifier.height(6.dp)
+                        Modifier.width(12.dp)
                 )
 
 
-                Row(
+                // ==================================================
+                // DETAILS
+                // ==================================================
 
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                Column(
+
+                    modifier =
+                        Modifier.weight(1f)
                 ) {
 
-                    Surface(
+                    Text(
 
-                        shape =
-                            RoundedCornerShape(7.dp),
+                        text =
+                            transaction.description
+                                ?.takeIf {
+                                    it.isNotBlank()
+                                }
+                                ?: "Transaction",
+
+                        fontSize =
+                            15.sp,
+
+                        fontWeight =
+                            FontWeight.Bold,
 
                         color =
-                            Color(0xFFF1F5F9)
-                    ) {
+                            MaterialTheme.colorScheme.onBackground,
 
-                        Text(
-
-                            text =
-                                categoryName,
-
-                            modifier =
-                                Modifier.padding(
-                                    horizontal = 7.dp,
-                                    vertical = 3.dp
-                                ),
-
-                            fontSize =
-                                10.sp,
-
-                            fontWeight =
-                                FontWeight.Medium,
-
-                            color =
-                                Color(0xFF64748B)
-                        )
-                    }
+                        maxLines =
+                            1
+                    )
 
 
                     Spacer(
                         modifier =
-                            Modifier.width(7.dp)
+                            Modifier.height(4.dp)
                     )
 
-
-                    Surface(
-
-                        shape =
-                            RoundedCornerShape(7.dp),
-
-                        color =
-                            iconBackground
-                    ) {
-
-                        Text(
-
-                            text =
-                                if (isIncome)
-                                    "Income"
-                                else
-                                    "Expense",
-
-                            modifier =
-                                Modifier.padding(
-                                    horizontal = 7.dp,
-                                    vertical = 3.dp
-                                ),
-
-                            fontSize =
-                                10.sp,
-
-                            fontWeight =
-                                FontWeight.Bold,
-
-                            color =
-                                iconColor
-                        )
-                    }
-                }
-
-
-                if (
-                    !transaction.created_at
-                        .isNullOrBlank()
-                ) {
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(6.dp)
-                    )
 
                     Row(
 
@@ -1268,459 +1285,255 @@ private fun TransactionListCard(
                                 null,
 
                             tint =
-                                Color(0xFF94A3B8),
+                                MaterialTheme.colorScheme.outline,
 
                             modifier =
-                                Modifier.size(12.dp)
+                                Modifier.size(13.dp)
                         )
+
 
                         Spacer(
                             modifier =
                                 Modifier.width(4.dp)
                         )
 
+
                         Text(
 
                             text =
                                 formatTransactionDate(
-                                    transaction.created_at
+                                    transaction.transaction_date
                                 ),
 
                             fontSize =
-                                10.sp,
+                                12.sp,
 
                             color =
-                                Color(0xFF94A3B8)
+                                MaterialTheme.colorScheme.outline
                         )
+
+
+                        transaction.transaction_time
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+                            ?.let {
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.width(8.dp)
+                                )
+
+                                Text(
+                                    text =
+                                        formatTransactionTime(
+                                            it
+                                        ),
+
+                                    fontSize =
+                                        12.sp,
+
+                                    color =
+                                        MaterialTheme.colorScheme.outline
+                                )
+                            }
                     }
+                }
+
+
+                // ==================================================
+                // EDIT
+                // ==================================================
+
+                IconButton(
+
+                    onClick =
+                        onEdit,
+
+                    modifier =
+                        Modifier.size(36.dp)
+                ) {
+
+                    Icon(
+
+                        imageVector =
+                            Icons.Default.Edit,
+
+                        contentDescription =
+                            "Edit transaction",
+
+                        tint =
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+
+                        modifier =
+                            Modifier.size(18.dp)
+                    )
+                }
+
+
+                // ==================================================
+                // DELETE
+                // ==================================================
+
+                IconButton(
+
+                    onClick =
+                        onDelete,
+
+                    modifier =
+                        Modifier.size(36.dp)
+                ) {
+
+                    Icon(
+
+                        imageVector =
+                            Icons.Default.Delete,
+
+                        contentDescription =
+                            "Delete transaction",
+
+                        tint =
+                            MaterialTheme.colorScheme.error,
+
+                        modifier =
+                            Modifier.size(18.dp)
+                    )
                 }
             }
 
 
             Spacer(
                 modifier =
-                    Modifier.width(10.dp)
+                    Modifier.height(12.dp)
             )
 
 
-            // ------------------------------------------
-            // AMOUNT
-            // ------------------------------------------
+            // ==================================================
+            // BOTTOM
+            // ==================================================
 
-            Text(
+            Row(
 
-                text =
-                    if (isIncome) {
+                modifier =
+                    Modifier.fillMaxWidth(),
 
-                        "+₹%.2f".format(
-                            transaction.amount
-                        )
+                horizontalArrangement =
+                    Arrangement.End,
 
-                    } else {
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
 
-                        "-₹%.2f".format(
-                            transaction.amount
-                        )
-                    },
+                Text(
 
-                fontSize =
-                    15.sp,
+                    text =
+                        if (isIncome) {
 
-                fontWeight =
-                    FontWeight.ExtraBold,
+                            "+₹${"%.2f".format(
+                                transaction.amount
+                            )}"
 
-                color =
-                    iconColor
-            )
+                        } else {
+
+                            "-₹${"%.2f".format(
+                                transaction.amount
+                            )}"
+                        },
+
+                    fontSize =
+                        17.sp,
+
+                    fontWeight =
+                        FontWeight.ExtraBold,
+
+                    color =
+                        if (isIncome) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        }
+                )
+            }
         }
     }
 }
 
 
 // ==========================================================
-// DATE FORMAT
+// DATE
 // ==========================================================
 
 private fun formatTransactionDate(
-    value: String?
+    date: String?
 ): String {
 
-    if (value.isNullOrBlank()) {
+    if (date.isNullOrBlank()) {
         return ""
     }
 
     return try {
 
-        val parsedDate =
+        val inputFormatter =
             SimpleDateFormat(
-                "yyyy-MM-dd'T'HH:mm:ss",
-                Locale.getDefault()
-            ).parse(value)
+                "yyyy-MM-dd",
+                Locale.US
+            )
 
+        val outputFormatter =
+            SimpleDateFormat(
+                "dd MMM yyyy",
+                Locale.getDefault()
+            )
+
+        val parsedDate =
+            inputFormatter.parse(date)
 
         if (parsedDate != null) {
-
-            SimpleDateFormat(
-                "dd MMM yyyy, hh:mm a",
-                Locale.getDefault()
-            ).format(parsedDate)
-
+            outputFormatter.format(parsedDate)
         } else {
-
-            value
+            date
         }
 
     } catch (e: Exception) {
 
-        value
+        date
     }
 }
 
 
 // ==========================================================
-// LOADING
+// TIME
 // ==========================================================
 
-@Composable
-private fun TransactionsLoading() {
+private fun formatTransactionTime(
+    time: String
+): String {
 
-    Column(
+    return try {
 
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = 60.dp,
-                    bottom = 60.dp
-                ),
-
-        horizontalAlignment =
-            Alignment.CenterHorizontally
-    ) {
-
-        CircularProgressIndicator(
-
-            modifier =
-                Modifier.size(45.dp),
-
-            strokeWidth =
-                4.dp,
-
-            color =
-                Color(0xFF2563EB)
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(16.dp)
-        )
-
-        Text(
-
-            text =
-                "Loading transactions...",
-
-            fontSize =
-                15.sp,
-
-            fontWeight =
-                FontWeight.SemiBold,
-
-            color =
-                Color(0xFF334155)
-        )
-    }
-}
-
-
-// ==========================================================
-// ERROR
-// ==========================================================
-
-@Composable
-private fun TransactionsError(
-    message: String,
-    onRetry: () -> Unit
-) {
-
-    Card(
-
-        modifier =
-            Modifier.fillMaxWidth(),
-
-        shape =
-            RoundedCornerShape(22.dp),
-
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    Color.White
-            ),
-
-        elevation =
-            CardDefaults.cardElevation(
-                defaultElevation =
-                    2.dp
-            )
-    ) {
-
-        Column(
-
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(28.dp),
-
-            horizontalAlignment =
-                Alignment.CenterHorizontally
-        ) {
-
-            Surface(
-
-                modifier =
-                    Modifier.size(60.dp),
-
-                shape =
-                    CircleShape,
-
-                color =
-                    Color(0xFFFFECEC)
-            ) {
-
-                Box(
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-
-                    Icon(
-
-                        imageVector =
-                            Icons.Default.ReceiptLong,
-
-                        contentDescription =
-                            null,
-
-                        tint =
-                            Color(0xFFDC2626),
-
-                        modifier =
-                            Modifier.size(28.dp)
-                    )
-                }
-            }
-
-
-            Spacer(
-                modifier =
-                    Modifier.height(14.dp)
+        val inputFormatter =
+            SimpleDateFormat(
+                "HH:mm:ss",
+                Locale.US
             )
 
-
-            Text(
-
-                text =
-                    "Couldn't load transactions",
-
-                fontSize =
-                    18.sp,
-
-                fontWeight =
-                    FontWeight.Bold,
-
-                color =
-                    Color(0xFF0F172A)
+        val outputFormatter =
+            SimpleDateFormat(
+                "hh:mm a",
+                Locale.getDefault()
             )
 
+        val parsedTime =
+            inputFormatter.parse(time)
 
-            Spacer(
-                modifier =
-                    Modifier.height(7.dp)
-            )
-
-
-            Text(
-
-                text =
-                    message,
-
-                fontSize =
-                    12.sp,
-
-                color =
-                    Color(0xFF64748B)
-            )
-
-
-            Spacer(
-                modifier =
-                    Modifier.height(18.dp)
-            )
-
-
-            Button(
-
-                onClick =
-                    onRetry,
-
-                shape =
-                    RoundedCornerShape(13.dp),
-
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor =
-                            Color(0xFF2563EB)
-                    )
-            ) {
-
-                Icon(
-
-                    imageVector =
-                        Icons.Default.Refresh,
-
-                    contentDescription =
-                        null,
-
-                    modifier =
-                        Modifier.size(18.dp)
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.width(7.dp)
-                )
-
-                Text(
-                    text =
-                        "Try Again",
-
-                    fontWeight =
-                        FontWeight.Bold
-                )
-            }
+        if (parsedTime != null) {
+            outputFormatter.format(parsedTime)
+        } else {
+            time
         }
+
+    } catch (e: Exception) {
+
+        time
     }
 }
-
-
-// ==========================================================
-// EMPTY STATE
-// ==========================================================
-
-@Composable
-private fun EmptyTransactions() {
-
-    Card(
-
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = 30.dp
-                ),
-
-        shape =
-            RoundedCornerShape(24.dp),
-
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    Color.White
-            ),
-
-        elevation =
-            CardDefaults.cardElevation(
-                defaultElevation =
-                    2.dp
-            )
-    ) {
-
-        Column(
-
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-
-            horizontalAlignment =
-                Alignment.CenterHorizontally
-        ) {
-
-            Surface(
-
-                modifier =
-                    Modifier.size(70.dp),
-
-                shape =
-                    CircleShape,
-
-                color =
-                    Color(0xFFEFF6FF)
-            ) {
-
-                Box(
-
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-
-                    Icon(
-
-                        imageVector =
-                            Icons.Default.ReceiptLong,
-
-                        contentDescription =
-                            null,
-
-                        tint =
-                            Color(0xFF2563EB),
-
-                        modifier =
-                            Modifier.size(34.dp)
-                    )
-                }
-            }
-
-
-            Spacer(
-                modifier =
-                    Modifier.height(16.dp)
-            )
-
-
-            Text(
-
-                text =
-                    "No transactions found",
-
-                fontSize =
-                    18.sp,
-
-                fontWeight =
-                    FontWeight.Bold,
-
-                color =
-                    Color(0xFF0F172A)
-            )
-
-
-            Spacer(
-                modifier =
-                    Modifier.height(7.dp)
-            )
-
-
-            Text(
-
-                text =
-                    "Try changing your filter or search for something else.",
-
-                fontSize =
-                    12.sp,
-
-                color =
-                    Color(0xFF94A3B8)
-            )
-        }
-    }
-}
-

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -32,92 +33,202 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
     tokenManager: TokenManager,
-    onBack: () -> Unit
+    transaction: Transaction? = null,
+    onBack: () -> Unit,
+    onEditSaved: () -> Unit = {},
+    onManageCategories: () -> Unit = {},
+    categoryRefreshKey: Int = 0
 ) {
 
+    // ==========================================================
+    // MODE
+    // ==========================================================
+
+    val isEditMode =
+        transaction != null
+
+
+    // ==========================================================
+    // FORM STATE
+    // ==========================================================
+
     var amount by remember {
-        mutableStateOf("")
+        mutableStateOf(
+            transaction?.amount
+                ?.let {
+                    "%.2f".format(it)
+                }
+                ?: ""
+        )
     }
 
     var description by remember {
-        mutableStateOf("")
+        mutableStateOf(
+            transaction?.description ?: ""
+        )
     }
 
     var transactionType by remember {
-        mutableStateOf("expense")
+        mutableStateOf(
+            transaction?.transaction_type
+                ?: "expense"
+        )
     }
+
 
     var categories by remember {
         mutableStateOf<List<Category>>(emptyList())
     }
 
+
     var selectedCategory by remember {
         mutableStateOf<Category?>(null)
     }
+
 
     var expanded by remember {
         mutableStateOf(false)
     }
 
+
     var isLoading by remember {
         mutableStateOf(false)
     }
+
 
     var isLoadingCategories by remember {
         mutableStateOf(true)
     }
 
+
     var message by remember {
         mutableStateOf<String?>(null)
     }
+
 
     var isSuccess by remember {
         mutableStateOf(false)
     }
 
-    // ==========================================
-    // Date
-    // ==========================================
+
+    // ==========================================================
+    // DATE
+    // ==========================================================
 
     var selectedDate by remember {
-        mutableStateOf(Date())
+
+        mutableStateOf(
+
+            transaction?.transaction_date
+                ?.let { dateString ->
+
+                    try {
+
+                        SimpleDateFormat(
+                            "yyyy-MM-dd",
+                            Locale.US
+                        ).apply {
+
+                            timeZone =
+                                TimeZone.getTimeZone(
+                                    "UTC"
+                                )
+
+                        }.parse(dateString)
+
+                    } catch (e: Exception) {
+
+                        null
+                    }
+
+                }
+                ?: Date()
+        )
     }
+
 
     var showDatePicker by remember {
         mutableStateOf(false)
     }
 
-    val dateFormatter = remember {
-        SimpleDateFormat(
-            "dd MMM yyyy",
-            Locale.getDefault()
-        )
-    }
 
-    // ==========================================
-    // Repositories
-    // ==========================================
+    // ==========================================================
+    // EXISTING TRANSACTION TIME
+    // ==========================================================
 
-    val scope = rememberCoroutineScope()
+    val existingTransactionTime =
+        transaction?.transaction_time
 
-    val categoryRepository = remember {
-        CategoryRepository(tokenManager)
-    }
 
-    val transactionRepository = remember {
-        TransactionRepository(tokenManager)
-    }
+    // ==========================================================
+    // FORMATTERS
+    // ==========================================================
 
-    // ==========================================
-    // Load Categories
-    // ==========================================
+    val dateFormatter =
+        remember {
 
-    LaunchedEffect(Unit) {
+            SimpleDateFormat(
+                "dd MMM yyyy",
+                Locale.getDefault()
+            )
+        }
+
+
+    val backendDateFormatter =
+        remember {
+
+            SimpleDateFormat(
+                "yyyy-MM-dd",
+                Locale.US
+            ).apply {
+
+                timeZone =
+                    TimeZone.getTimeZone(
+                        "UTC"
+                    )
+            }
+        }
+
+
+    // ==========================================================
+    // REPOSITORIES
+    // ==========================================================
+
+    val scope =
+        rememberCoroutineScope()
+
+
+    val categoryRepository =
+        remember {
+
+            CategoryRepository(
+                tokenManager
+            )
+        }
+
+
+    val transactionRepository =
+        remember {
+
+            TransactionRepository(
+                tokenManager
+            )
+        }
+
+
+    // ==========================================================
+    // LOAD / REFRESH CATEGORIES
+    // ==========================================================
+
+    LaunchedEffect(categoryRefreshKey) {
+
+        isLoadingCategories = true
 
         categoryRepository
             .getCategories()
@@ -126,6 +237,7 @@ fun AddTransactionScreen(
                 categories = it
 
                 isLoadingCategories = false
+
             }
             .onFailure {
 
@@ -136,17 +248,44 @@ fun AddTransactionScreen(
             }
     }
 
-    // ==========================================
-    // Date Picker
-    // ==========================================
+
+    // ==========================================================
+    // SELECT EXISTING CATEGORY AFTER CATEGORIES LOAD
+    // ==========================================================
+
+    LaunchedEffect(
+        categories,
+        transaction
+    ) {
+
+        if (
+            transaction != null &&
+            categories.isNotEmpty()
+        ) {
+
+            selectedCategory =
+                categories.find {
+
+                    it.id ==
+                            transaction.category_id
+                }
+        }
+    }
+
+
+    // ==========================================================
+    // DATE PICKER
+    // ==========================================================
 
     if (showDatePicker) {
 
         val datePickerState =
             rememberDatePickerState(
+
                 initialSelectedDateMillis =
                     selectedDate.time
             )
+
 
         DatePickerDialog(
 
@@ -154,6 +293,7 @@ fun AddTransactionScreen(
 
                 showDatePicker = false
             },
+
 
             confirmButton = {
 
@@ -169,22 +309,32 @@ fun AddTransactionScreen(
                                     Date(millis)
                             }
 
-                        showDatePicker = false
 
-                        message = null
-                        isSuccess = false
+                        showDatePicker =
+                            false
+
+                        message =
+                            null
+
+                        isSuccess =
+                            false
                     }
                 ) {
 
                     Text(
-                        text = "Select",
+
+                        text =
+                            "Select",
+
                         fontWeight =
                             FontWeight.Bold,
+
                         color =
-                            Color(0xFF2563EB)
+                            MaterialTheme.colorScheme.primary
                     )
                 }
             },
+
 
             dismissButton = {
 
@@ -192,60 +342,76 @@ fun AddTransactionScreen(
 
                     onClick = {
 
-                        showDatePicker = false
+                        showDatePicker =
+                            false
                     }
                 ) {
 
                     Text(
-                        text = "Cancel",
+
+                        text =
+                            "Cancel",
+
                         color =
-                            Color(0xFF64748B)
+                            MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+
         ) {
 
             DatePicker(
-                state = datePickerState
+                state =
+                    datePickerState
             )
         }
     }
 
-    // ==========================================
-    // Screen
-    // ==========================================
+
+    // ==========================================================
+    // SCREEN
+    // ==========================================================
 
     Scaffold(
 
         containerColor =
-            Color(0xFFF7F9FC),
+            MaterialTheme.colorScheme.background,
+
 
         topBar = {
 
             Surface(
-                color = Color.White,
-                shadowElevation = 2.dp
+
+                color =
+                    MaterialTheme.colorScheme.surface,
+
+                shadowElevation =
+                    2.dp
             ) {
 
                 Row(
 
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(
-                            horizontal = 8.dp,
-                            vertical = 8.dp
-                        ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(
+                                horizontal = 8.dp,
+                                vertical = 8.dp
+                            ),
 
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
 
                     IconButton(
-                        onClick = onBack
+
+                        onClick =
+                            onBack
                     ) {
 
                         Icon(
+
                             imageVector =
                                 Icons.Default.ArrowBack,
 
@@ -253,38 +419,52 @@ fun AddTransactionScreen(
                                 "Back",
 
                             tint =
-                                Color(0xFF0F172A)
+                                MaterialTheme.colorScheme.onBackground
                         )
                     }
 
+
                     Column(
+
                         modifier =
                             Modifier.weight(1f)
                     ) {
 
                         Text(
-                            text =
-                                "Add Transaction",
 
-                            fontSize = 21.sp,
+                            text =
+                                if (isEditMode)
+                                    "Edit Transaction"
+                                else
+                                    "Add Transaction",
+
+                            fontSize =
+                                21.sp,
 
                             fontWeight =
                                 FontWeight.ExtraBold,
 
                             color =
-                                Color(0xFF0F172A)
+                                MaterialTheme.colorScheme.onBackground
                         )
+
 
                         Text(
-                            text =
-                                "Record your income or expense",
 
-                            fontSize = 12.sp,
+                            text =
+                                if (isEditMode)
+                                    "Update your transaction details"
+                                else
+                                    "Record your income or expense",
+
+                            fontSize =
+                                12.sp,
 
                             color =
-                                Color(0xFF94A3B8)
+                                MaterialTheme.colorScheme.outline
                         )
                     }
+
 
                     Box(
 
@@ -292,8 +472,9 @@ fun AddTransactionScreen(
                             Modifier
                                 .size(42.dp)
                                 .background(
+
                                     color =
-                                        Color(0xFFEFF6FF),
+                                        MaterialTheme.colorScheme.primaryContainer,
 
                                     shape =
                                         CircleShape
@@ -304,14 +485,18 @@ fun AddTransactionScreen(
                     ) {
 
                         Icon(
+
                             imageVector =
-                                Icons.Default.ReceiptLong,
+                                if (isEditMode)
+                                    Icons.Default.Edit
+                                else
+                                    Icons.Default.ReceiptLong,
 
                             contentDescription =
                                 null,
 
                             tint =
-                                Color(0xFF2563EB)
+                                MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -329,6 +514,8 @@ fun AddTransactionScreen(
                     .padding(
                         horizontal = 18.dp
                     )
+                    .imePadding()
+                    .navigationBarsPadding()
                     .verticalScroll(
                         rememberScrollState()
                     ),
@@ -342,9 +529,10 @@ fun AddTransactionScreen(
                     Modifier.height(2.dp)
             )
 
-            // ==========================================
-            // Amount Card
-            // ==========================================
+
+            // ==================================================
+            // AMOUNT CARD
+            // ==================================================
 
             Card(
 
@@ -357,12 +545,13 @@ fun AddTransactionScreen(
                 colors =
                     CardDefaults.cardColors(
                         containerColor =
-                            Color.White
+                            MaterialTheme.colorScheme.surface
                     ),
 
                 elevation =
                     CardDefaults.cardElevation(
-                        defaultElevation = 2.dp
+                        defaultElevation =
+                            2.dp
                     )
             ) {
 
@@ -389,8 +578,9 @@ fun AddTransactionScreen(
                                 Modifier
                                     .size(36.dp)
                                     .background(
+
                                         color =
-                                            Color(0xFFEFF6FF),
+                                            MaterialTheme.colorScheme.primaryContainer,
 
                                         shape =
                                             CircleShape
@@ -401,6 +591,7 @@ fun AddTransactionScreen(
                         ) {
 
                             Icon(
+
                                 imageVector =
                                     Icons.Default.Payments,
 
@@ -408,38 +599,45 @@ fun AddTransactionScreen(
                                     null,
 
                                 tint =
-                                    Color(0xFF2563EB),
+                                    MaterialTheme.colorScheme.primary,
 
                                 modifier =
                                     Modifier.size(20.dp)
                             )
                         }
 
+
                         Spacer(
                             modifier =
                                 Modifier.width(10.dp)
                         )
 
+
                         Text(
+
                             text =
                                 "TRANSACTION AMOUNT",
 
-                            fontSize = 12.sp,
+                            fontSize =
+                                12.sp,
 
                             fontWeight =
                                 FontWeight.Bold,
 
-                            letterSpacing = 0.8.sp,
+                            letterSpacing =
+                                0.8.sp,
 
                             color =
-                                Color(0xFF64748B)
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
 
                     Spacer(
                         modifier =
                             Modifier.height(12.dp)
                     )
+
 
                     Row(
 
@@ -454,25 +652,31 @@ fun AddTransactionScreen(
                     ) {
 
                         Text(
-                            text = "₹",
 
-                            fontSize = 34.sp,
+                            text =
+                                "₹",
+
+                            fontSize =
+                                34.sp,
 
                             fontWeight =
                                 FontWeight.ExtraBold,
 
                             color =
-                                Color(0xFF2563EB)
+                                MaterialTheme.colorScheme.primary
                         )
+
 
                         Spacer(
                             modifier =
                                 Modifier.width(8.dp)
                         )
 
+
                         OutlinedTextField(
 
-                            value = amount,
+                            value =
+                                amount,
 
                             onValueChange = {
 
@@ -485,92 +689,112 @@ fun AddTransactionScreen(
                                     )
                                 ) {
 
-                                    amount = it
+                                    amount =
+                                        it
 
-                                    message = null
+                                    message =
+                                        null
 
-                                    isSuccess = false
+                                    isSuccess =
+                                        false
                                 }
                             },
+
 
                             placeholder = {
 
                                 Text(
-                                    text = "0.00",
 
-                                    fontSize = 30.sp,
+                                    text =
+                                        "0.00",
+
+                                    fontSize =
+                                        30.sp,
 
                                     fontWeight =
                                         FontWeight.Bold,
 
                                     color =
-                                        Color(0xFFCBD5E1)
+                                        MaterialTheme.colorScheme.outline
                                 )
                             },
 
-                            singleLine = true,
+
+                            singleLine =
+                                true,
+
 
                             textStyle =
                                 LocalTextStyle.current.copy(
 
-                                    fontSize = 30.sp,
+                                    fontSize =
+                                        30.sp,
 
                                     fontWeight =
                                         FontWeight.ExtraBold,
 
                                     color =
-                                        Color(0xFF0F172A)
+                                        MaterialTheme.colorScheme.onBackground
                                 ),
+
 
                             keyboardOptions =
                                 KeyboardOptions(
+
                                     keyboardType =
                                         KeyboardType.Decimal
                                 ),
 
+
                             modifier =
                                 Modifier.weight(1f),
 
+
                             shape =
                                 RoundedCornerShape(16.dp),
+
 
                             colors =
                                 OutlinedTextFieldDefaults
                                     .colors(
 
                                         unfocusedContainerColor =
-                                            Color(0xFFF8FAFC),
+                                            MaterialTheme.colorScheme.surfaceVariant,
 
                                         focusedContainerColor =
-                                            Color(0xFFF8FAFC),
+                                            MaterialTheme.colorScheme.surfaceVariant,
 
                                         unfocusedBorderColor =
-                                            Color(0xFFE2E8F0),
+                                            MaterialTheme.colorScheme.outline,
 
                                         focusedBorderColor =
-                                            Color(0xFF2563EB)
+                                            MaterialTheme.colorScheme.primary
                                     )
                         )
                     }
                 }
             }
 
-            // ==========================================
-            // Transaction Type
-            // ==========================================
+
+            // ==================================================
+            // TRANSACTION TYPE
+            // ==================================================
 
             Text(
+
                 text =
                     "Transaction type",
 
-                fontSize = 15.sp,
+                fontSize =
+                    15.sp,
 
                 fontWeight =
                     FontWeight.Bold,
 
                 color =
-                    Color(0xFF0F172A)
+                    MaterialTheme.colorScheme.onBackground
             )
+
 
             Row(
 
@@ -590,7 +814,8 @@ fun AddTransactionScreen(
                         "Money spent",
 
                     selected =
-                        transactionType == "expense",
+                        transactionType ==
+                                "expense",
 
                     icon =
                         "↓",
@@ -603,13 +828,17 @@ fun AddTransactionScreen(
                         transactionType =
                             "expense"
 
-                        selectedCategory = null
+                        selectedCategory =
+                            null
 
-                        message = null
+                        message =
+                            null
 
-                        isSuccess = false
+                        isSuccess =
+                            false
                     }
                 )
+
 
                 TransactionTypeCard(
 
@@ -620,7 +849,8 @@ fun AddTransactionScreen(
                         "Money received",
 
                     selected =
-                        transactionType == "income",
+                        transactionType ==
+                                "income",
 
                     icon =
                         "↑",
@@ -633,31 +863,86 @@ fun AddTransactionScreen(
                         transactionType =
                             "income"
 
-                        selectedCategory = null
+                        selectedCategory =
+                            null
 
-                        message = null
+                        message =
+                            null
 
-                        isSuccess = false
+                        isSuccess =
+                            false
                     }
                 )
             }
 
-            // ==========================================
-            // Category
-            // ==========================================
 
-            Text(
-                text =
-                    "Category",
+            // ==================================================
+            // CATEGORY HEADER
+            // ==================================================
 
-                fontSize = 15.sp,
+            Row(
 
-                fontWeight =
-                    FontWeight.Bold,
+                modifier =
+                    Modifier.fillMaxWidth(),
 
-                color =
-                    Color(0xFF0F172A)
-            )
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Text(
+
+                    text =
+                        "Category",
+
+                    fontSize =
+                        15.sp,
+
+                    fontWeight =
+                        FontWeight.Bold,
+
+                    color =
+                        MaterialTheme.colorScheme.onBackground,
+
+                    modifier =
+                        Modifier.weight(1f)
+                )
+
+
+                TextButton(
+
+                    onClick = {
+
+                        expanded =
+                            false
+
+                        message =
+                            null
+
+                        isSuccess =
+                            false
+
+                        onManageCategories()
+                    }
+                ) {
+
+                    Text(
+
+                        text =
+                            "Manage",
+
+                        fontWeight =
+                            FontWeight.Bold,
+
+                        color =
+                            MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+
+            // ==================================================
+            // CATEGORY DROPDOWN
+            // ==================================================
 
             if (isLoadingCategories) {
 
@@ -674,7 +959,7 @@ fun AddTransactionScreen(
                     colors =
                         CardDefaults.cardColors(
                             containerColor =
-                                Color.White
+                                MaterialTheme.colorScheme.surface
                         )
                 ) {
 
@@ -692,10 +977,11 @@ fun AddTransactionScreen(
                             modifier =
                                 Modifier.size(22.dp),
 
-                            strokeWidth = 2.dp,
+                            strokeWidth =
+                                2.dp,
 
                             color =
-                                Color(0xFF2563EB)
+                                MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -723,9 +1009,11 @@ fun AddTransactionScreen(
 
                         onValueChange = {},
 
-                        readOnly = true,
+                        readOnly =
+                            true,
 
-                        singleLine = true,
+                        singleLine =
+                            true,
 
                         leadingIcon = {
 
@@ -735,7 +1023,9 @@ fun AddTransactionScreen(
                                     Modifier
                                         .size(34.dp)
                                         .background(
-                                            Color(0xFFF1F5F9),
+
+                                            MaterialTheme.colorScheme.surfaceVariant,
+
                                             CircleShape
                                         ),
 
@@ -746,14 +1036,13 @@ fun AddTransactionScreen(
                                 Icon(
 
                                     imageVector =
-                                        Icons.Default
-                                            .ReceiptLong,
+                                        Icons.Default.ReceiptLong,
 
                                     contentDescription =
                                         null,
 
                                     tint =
-                                        Color(0xFF475569),
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
 
                                     modifier =
                                         Modifier.size(19.dp)
@@ -761,47 +1050,51 @@ fun AddTransactionScreen(
                             }
                         },
 
+
                         trailingIcon = {
 
                             Icon(
 
                                 imageVector =
-                                    Icons.Default
-                                        .ExpandMore,
+                                    Icons.Default.ExpandMore,
 
                                 contentDescription =
                                     "Select category",
 
                                 tint =
-                                    Color(0xFF64748B)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
+
 
                         modifier =
                             Modifier
                                 .fillMaxWidth()
                                 .menuAnchor(),
 
+
                         shape =
                             RoundedCornerShape(16.dp),
+
 
                         colors =
                             OutlinedTextFieldDefaults
                                 .colors(
 
                                     unfocusedContainerColor =
-                                        Color.White,
+                                        MaterialTheme.colorScheme.surface,
 
                                     focusedContainerColor =
-                                        Color.White,
+                                        MaterialTheme.colorScheme.surface,
 
                                     unfocusedBorderColor =
-                                        Color(0xFFE2E8F0),
+                                        MaterialTheme.colorScheme.outline,
 
                                     focusedBorderColor =
-                                        Color(0xFF2563EB)
+                                        MaterialTheme.colorScheme.primary
                                 )
                     )
+
 
                     ExposedDropdownMenu(
 
@@ -818,11 +1111,14 @@ fun AddTransactionScreen(
                         val filteredCategories =
                             categories.filter {
 
-                                it.category_type.equals(
-                                    transactionType,
-                                    ignoreCase = true
-                                )
+                                it.category_type
+                                    .equals(
+                                        transactionType,
+                                        ignoreCase =
+                                            true
+                                    )
                             }
+
 
                         if (
                             filteredCategories.isEmpty()
@@ -854,26 +1150,27 @@ fun AddTransactionScreen(
                                         text = {
 
                                             Text(
-                                                category
-                                                    .category_name,
+
+                                                category.category_name,
 
                                                 fontWeight =
                                                     FontWeight.Medium
                                             )
                                         },
 
+
                                         leadingIcon = {
 
                                             Icon(
 
                                                 imageVector =
-                                                    Icons.Default
-                                                        .ReceiptLong,
+                                                    Icons.Default.ReceiptLong,
 
                                                 contentDescription =
                                                     null
                                             )
                                         },
+
 
                                         onClick = {
 
@@ -883,7 +1180,8 @@ fun AddTransactionScreen(
                                             expanded =
                                                 false
 
-                                            message = null
+                                            message =
+                                                null
 
                                             isSuccess =
                                                 false
@@ -895,22 +1193,26 @@ fun AddTransactionScreen(
                 }
             }
 
-            // ==========================================
-            // Date
-            // ==========================================
+
+            // ==================================================
+            // DATE
+            // ==================================================
 
             Text(
+
                 text =
                     "Transaction date",
 
-                fontSize = 15.sp,
+                fontSize =
+                    15.sp,
 
                 fontWeight =
                     FontWeight.Bold,
 
                 color =
-                    Color(0xFF0F172A)
+                    MaterialTheme.colorScheme.onBackground
             )
+
 
             Card(
 
@@ -923,12 +1225,13 @@ fun AddTransactionScreen(
                 colors =
                     CardDefaults.cardColors(
                         containerColor =
-                            Color.White
+                            MaterialTheme.colorScheme.surface
                     ),
 
                 elevation =
                     CardDefaults.cardElevation(
-                        defaultElevation = 1.dp
+                        defaultElevation =
+                            1.dp
                     ),
 
                 onClick = {
@@ -955,8 +1258,9 @@ fun AddTransactionScreen(
                             Modifier
                                 .size(44.dp)
                                 .background(
+
                                     color =
-                                        Color(0xFFEFF6FF),
+                                        MaterialTheme.colorScheme.primaryContainer,
 
                                     shape =
                                         CircleShape
@@ -975,17 +1279,19 @@ fun AddTransactionScreen(
                                 null,
 
                             tint =
-                                Color(0xFF2563EB),
+                                MaterialTheme.colorScheme.primary,
 
                             modifier =
                                 Modifier.size(21.dp)
                         )
                     }
 
+
                     Spacer(
                         modifier =
                             Modifier.width(13.dp)
                     )
+
 
                     Column(
                         modifier =
@@ -993,66 +1299,79 @@ fun AddTransactionScreen(
                     ) {
 
                         Text(
+
                             text =
                                 "Selected date",
 
-                            fontSize = 11.sp,
+                            fontSize =
+                                11.sp,
 
                             color =
-                                Color(0xFF94A3B8)
+                                MaterialTheme.colorScheme.outline
                         )
+
 
                         Spacer(
                             modifier =
                                 Modifier.height(3.dp)
                         )
 
+
                         Text(
+
                             text =
                                 dateFormatter
                                     .format(selectedDate),
 
-                            fontSize = 17.sp,
+                            fontSize =
+                                17.sp,
 
                             fontWeight =
                                 FontWeight.ExtraBold,
 
                             color =
-                                Color(0xFF2563EB)
+                                MaterialTheme.colorScheme.primary
                         )
                     }
 
+
                     Text(
+
                         text =
                             "Change",
 
-                        fontSize = 12.sp,
+                        fontSize =
+                            12.sp,
 
                         fontWeight =
                             FontWeight.Bold,
 
                         color =
-                            Color(0xFF2563EB)
+                            MaterialTheme.colorScheme.primary
                     )
                 }
             }
 
-            // ==========================================
-            // Description
-            // ==========================================
+
+            // ==================================================
+            // DESCRIPTION
+            // ==================================================
 
             Text(
+
                 text =
                     "Description",
 
-                fontSize = 15.sp,
+                fontSize =
+                    15.sp,
 
                 fontWeight =
                     FontWeight.Bold,
 
                 color =
-                    Color(0xFF0F172A)
+                    MaterialTheme.colorScheme.onBackground
             )
+
 
             OutlinedTextField(
 
@@ -1064,10 +1383,13 @@ fun AddTransactionScreen(
                     description =
                         it
 
-                    message = null
+                    message =
+                        null
 
-                    isSuccess = false
+                    isSuccess =
+                        false
                 },
+
 
                 placeholder = {
 
@@ -1075,6 +1397,7 @@ fun AddTransactionScreen(
                         "What was this transaction for?"
                     )
                 },
+
 
                 leadingIcon = {
 
@@ -1087,41 +1410,49 @@ fun AddTransactionScreen(
                             null,
 
                         tint =
-                            Color(0xFF64748B)
+                            MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
+
 
                 modifier =
                     Modifier.fillMaxWidth(),
 
-                minLines = 2,
 
-                maxLines = 3,
+                minLines =
+                    2,
+
+
+                maxLines =
+                    3,
+
 
                 shape =
                     RoundedCornerShape(16.dp),
+
 
                 colors =
                     OutlinedTextFieldDefaults
                         .colors(
 
                             unfocusedContainerColor =
-                                Color.White,
+                                MaterialTheme.colorScheme.surface,
 
                             focusedContainerColor =
-                                Color.White,
+                                MaterialTheme.colorScheme.surface,
 
                             unfocusedBorderColor =
-                                Color(0xFFE2E8F0),
+                                MaterialTheme.colorScheme.outline,
 
                             focusedBorderColor =
-                                Color(0xFF2563EB)
+                                MaterialTheme.colorScheme.primary
                         )
             )
 
-            // ==========================================
-            // Status Message
-            // ==========================================
+
+            // ==================================================
+            // STATUS MESSAGE
+            // ==================================================
 
             message?.let { text ->
 
@@ -1139,11 +1470,11 @@ fun AddTransactionScreen(
                             containerColor =
                                 if (isSuccess) {
 
-                                    Color(0xFFECFDF5)
+                                    MaterialTheme.colorScheme.tertiaryContainer
 
                                 } else {
 
-                                    Color(0xFFFEF2F2)
+                                    MaterialTheme.colorScheme.errorContainer
                                 }
                         )
                 ) {
@@ -1164,15 +1495,15 @@ fun AddTransactionScreen(
                             Icon(
 
                                 imageVector =
-                                    Icons.Default
-                                        .CheckCircle,
+                                    Icons.Default.CheckCircle,
 
                                 contentDescription =
                                     null,
 
                                 tint =
-                                    Color(0xFF16A34A)
+                                    MaterialTheme.colorScheme.tertiary
                             )
+
 
                             Spacer(
                                 modifier =
@@ -1180,12 +1511,14 @@ fun AddTransactionScreen(
                             )
                         }
 
+
                         Text(
 
                             text =
                                 text,
 
-                            fontSize = 14.sp,
+                            fontSize =
+                                14.sp,
 
                             fontWeight =
                                 FontWeight.Medium,
@@ -1193,20 +1526,21 @@ fun AddTransactionScreen(
                             color =
                                 if (isSuccess) {
 
-                                    Color(0xFF166534)
+                                    MaterialTheme.colorScheme.onTertiaryContainer
 
                                 } else {
 
-                                    Color(0xFFB91C1C)
+                                    MaterialTheme.colorScheme.onErrorContainer
                                 }
                         )
                     }
                 }
             }
 
-            // ==========================================
-            // Save Button
-            // ==========================================
+
+            // ==================================================
+            // SAVE / UPDATE BUTTON
+            // ==================================================
 
             Button(
 
@@ -1214,6 +1548,7 @@ fun AddTransactionScreen(
 
                     val amountValue =
                         amount.toDoubleOrNull()
+
 
                     if (
                         amountValue == null ||
@@ -1229,6 +1564,7 @@ fun AddTransactionScreen(
                         return@Button
                     }
 
+
                     if (
                         selectedCategory == null
                     ) {
@@ -1242,6 +1578,13 @@ fun AddTransactionScreen(
                         return@Button
                     }
 
+
+                    val transactionDate =
+                        backendDateFormatter.format(
+                            selectedDate
+                        )
+
+
                     scope.launch {
 
                         isLoading =
@@ -1253,8 +1596,19 @@ fun AddTransactionScreen(
                         isSuccess =
                             false
 
-                        val transaction =
+
+                        // ==================================================
+                        // BUILD TRANSACTION
+                        // ==================================================
+
+                        val updatedTransaction =
                             Transaction(
+
+                                id =
+                                    transaction?.id,
+
+                                user_id =
+                                    transaction?.user_id,
 
                                 category_id =
                                     selectedCategory!!.id,
@@ -1269,65 +1623,154 @@ fun AddTransactionScreen(
                                         },
 
                                 transaction_type =
-                                    transactionType
+                                    transactionType,
+
+                                transaction_date =
+                                    transactionDate,
+
+                                transaction_time =
+                                    if (isEditMode) {
+
+                                        existingTransactionTime
+
+                                    } else {
+
+                                        null
+                                    },
+
+                                created_at =
+                                    transaction?.created_at,
+
+                                updated_at =
+                                    transaction?.updated_at
                             )
 
-                        val result =
-                            transactionRepository
-                                .createTransaction(
-                                    transaction
-                                )
 
-                        isLoading =
-                            false
+                        // ==================================================
+                        // ADD
+                        // ==================================================
 
-                        result.onSuccess {
+                        if (!isEditMode) {
 
-                            message =
-                                "Transaction added successfully"
+                            val result =
+                                transactionRepository
+                                    .createTransaction(
+                                        updatedTransaction
+                                    )
 
-                            isSuccess =
-                                true
 
-                            amount =
-                                ""
-
-                            description =
-                                ""
-
-                            selectedCategory =
-                                null
-
-                        }.onFailure {
-
-                            message =
-                                "Failed: ${it.message}"
-
-                            isSuccess =
+                            isLoading =
                                 false
+
+
+                            result.onSuccess {
+
+                                message =
+                                    "Transaction added successfully"
+
+                                isSuccess =
+                                    true
+
+                                amount =
+                                    ""
+
+                                description =
+                                    ""
+
+                                selectedCategory =
+                                    null
+
+                            }.onFailure {
+
+                                message =
+                                    "Failed: ${it.message}"
+
+                                isSuccess =
+                                    false
+                            }
+
+
+                        } else {
+
+                            // ==================================================
+                            // UPDATE
+                            // ==================================================
+
+                            val transactionId =
+                                transaction?.id
+
+
+                            if (transactionId == null) {
+
+                                isLoading =
+                                    false
+
+                                message =
+                                    "Transaction ID is missing"
+
+                                isSuccess =
+                                    false
+
+                                return@launch
+                            }
+
+
+                            val result =
+                                transactionRepository
+                                    .updateTransaction(
+
+                                        transactionId =
+                                            transactionId,
+
+                                        request =
+                                            updatedTransaction
+                                    )
+
+
+                            isLoading =
+                                false
+
+
+                            result.onSuccess {
+
+                                onEditSaved()
+
+                            }.onFailure {
+
+                                message =
+                                    "Failed to update transaction: ${it.message}"
+
+                                isSuccess =
+                                    false
+                            }
                         }
                     }
                 },
+
 
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .height(58.dp),
 
+
                 enabled =
                     !isLoading &&
                             !isLoadingCategories,
 
+
                 shape =
                     RoundedCornerShape(18.dp),
 
+
                 colors =
                     ButtonDefaults.buttonColors(
+
                         containerColor =
-                            Color(0xFF2563EB),
+                            MaterialTheme.colorScheme.primary,
 
                         contentColor =
-                            Color.White
+                            MaterialTheme.colorScheme.onPrimary
                     )
             ) {
 
@@ -1338,10 +1781,11 @@ fun AddTransactionScreen(
                         modifier =
                             Modifier.size(22.dp),
 
-                        strokeWidth = 2.dp,
+                        strokeWidth =
+                            2.dp,
 
                         color =
-                            Color.White
+                            MaterialTheme.colorScheme.surface
                     )
 
                 } else {
@@ -1349,7 +1793,10 @@ fun AddTransactionScreen(
                     Icon(
 
                         imageVector =
-                            Icons.Default.CheckCircle,
+                            if (isEditMode)
+                                Icons.Default.Edit
+                            else
+                                Icons.Default.CheckCircle,
 
                         contentDescription =
                             null,
@@ -1358,23 +1805,30 @@ fun AddTransactionScreen(
                             Modifier.size(21.dp)
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.width(9.dp)
                     )
 
+
                     Text(
 
                         text =
-                            "Save Transaction",
+                            if (isEditMode)
+                                "Update Transaction"
+                            else
+                                "Save Transaction",
 
-                        fontSize = 16.sp,
+                        fontSize =
+                            16.sp,
 
                         fontWeight =
                             FontWeight.Bold
                     )
                 }
             }
+
 
             Spacer(
                 modifier =
@@ -1384,8 +1838,9 @@ fun AddTransactionScreen(
     }
 }
 
+
 // ======================================================
-// Transaction Type Card
+// TRANSACTION TYPE CARD
 // ======================================================
 
 @Composable
@@ -1415,32 +1870,43 @@ private fun TransactionTypeCard(
                 containerColor =
                     if (selected) {
 
-                        Color(0xFFEFF6FF)
+                        MaterialTheme.colorScheme.primaryContainer
 
                     } else {
 
-                        Color.White
+                        MaterialTheme.colorScheme.surface
                     }
             ),
 
         border =
             if (selected) {
 
-                androidx.compose.foundation.BorderStroke(
-                    width = 1.5.dp,
-                    color = Color(0xFF2563EB)
-                )
+                androidx.compose.foundation
+                    .BorderStroke(
+
+                        width =
+                            1.5.dp,
+
+                        color =
+                            MaterialTheme.colorScheme.primary
+                    )
 
             } else {
 
-                androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = Color(0xFFE2E8F0)
-                )
+                androidx.compose.foundation
+                    .BorderStroke(
+
+                        width =
+                            1.dp,
+
+                        color =
+                            MaterialTheme.colorScheme.outline
+                    )
             },
 
         elevation =
             CardDefaults.cardElevation(
+
                 defaultElevation =
                     if (selected) {
                         2.dp
@@ -1471,11 +1937,11 @@ private fun TransactionTypeCard(
                             color =
                                 if (selected) {
 
-                                    Color(0xFF2563EB)
+                                    MaterialTheme.colorScheme.primary
 
                                 } else {
 
-                                    Color(0xFFF1F5F9)
+                                    MaterialTheme.colorScheme.surfaceVariant
                                 },
 
                             shape =
@@ -1491,7 +1957,8 @@ private fun TransactionTypeCard(
                     text =
                         icon,
 
-                    fontSize = 20.sp,
+                    fontSize =
+                        20.sp,
 
                     fontWeight =
                         FontWeight.ExtraBold,
@@ -1499,19 +1966,21 @@ private fun TransactionTypeCard(
                     color =
                         if (selected) {
 
-                            Color.White
+                            MaterialTheme.colorScheme.onPrimary
 
                         } else {
 
-                            Color(0xFF64748B)
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         }
                 )
             }
+
 
             Spacer(
                 modifier =
                     Modifier.width(10.dp)
             )
+
 
             Column {
 
@@ -1520,24 +1989,27 @@ private fun TransactionTypeCard(
                     text =
                         title,
 
-                    fontSize = 14.sp,
+                    fontSize =
+                        14.sp,
 
                     fontWeight =
                         FontWeight.Bold,
 
                     color =
-                        Color(0xFF0F172A)
+                        MaterialTheme.colorScheme.onBackground
                 )
+
 
                 Text(
 
                     text =
                         subtitle,
 
-                    fontSize = 11.sp,
+                    fontSize =
+                        11.sp,
 
                     color =
-                        Color(0xFF94A3B8)
+                        MaterialTheme.colorScheme.outline
                 )
             }
         }

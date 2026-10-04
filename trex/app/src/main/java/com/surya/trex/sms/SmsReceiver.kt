@@ -14,17 +14,20 @@ import com.surya.trex.data.repository.PendingTransactionRepository
 import com.surya.trex.data.repository.SettingsRepository
 import com.surya.trex.data.repository.TransactionRepository
 import com.surya.trex.notifications.TransactionNotificationHelper
-
+import com.surya.trex.data.repository.DashboardRefreshManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-import java.math.BigDecimal
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SmsReceiver : BroadcastReceiver() {
 
     companion object {
+
         private const val TAG = "TREX_SMS"
 
         private const val MODE_AUTO = "AUTO"
@@ -36,6 +39,7 @@ class SmsReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent
     ) {
+
         if (
             intent.action !=
             Telephony.Sms.Intents.SMS_RECEIVED_ACTION
@@ -43,24 +47,31 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val pendingResult = goAsync()
+        val pendingResult =
+            goAsync()
 
         val appContext =
             context.applicationContext
 
         CoroutineScope(Dispatchers.IO).launch {
+
             try {
+
                 processSms(
                     context = appContext,
                     intent = intent
                 )
+
             } catch (e: Exception) {
+
                 Log.e(
                     TAG,
                     "Error processing SMS",
                     e
                 )
+
             } finally {
+
                 pendingResult.finish()
             }
         }
@@ -80,10 +91,12 @@ class SmsReceiver : BroadcastReceiver() {
                 .getMessagesFromIntent(intent)
 
         if (messages.isNullOrEmpty()) {
+
             Log.d(
                 TAG,
                 "No SMS messages found."
             )
+
             return
         }
 
@@ -94,10 +107,12 @@ class SmsReceiver : BroadcastReceiver() {
                 ?.trim()
 
         if (sender.isNullOrBlank()) {
+
             Log.d(
                 TAG,
                 "SMS sender is empty."
             )
+
             return
         }
 
@@ -109,10 +124,12 @@ class SmsReceiver : BroadcastReceiver() {
                 .trim()
 
         if (messageBody.isBlank()) {
+
             Log.d(
                 TAG,
                 "SMS message body is empty."
             )
+
             return
         }
 
@@ -149,6 +166,11 @@ class SmsReceiver : BroadcastReceiver() {
 
         Log.d(
             TAG,
+            "Local Date/Time: ${timestampToIsoString(timestamp)}"
+        )
+
+        Log.d(
+            TAG,
             "======================================"
         )
 
@@ -163,10 +185,12 @@ class SmsReceiver : BroadcastReceiver() {
             tokenManager.getToken()
 
         if (token.isNullOrBlank()) {
+
             Log.d(
                 TAG,
                 "No authentication token. SMS ignored."
             )
+
             return
         }
 
@@ -179,13 +203,18 @@ class SmsReceiver : BroadcastReceiver() {
 
         val settings =
             try {
-                settingsRepository.getSettings(token)
+
+                settingsRepository
+                    .getSettings(token)
+
             } catch (e: Exception) {
+
                 Log.e(
                     TAG,
                     "Failed to load user settings.",
                     e
                 )
+
                 return
             }
 
@@ -217,8 +246,6 @@ class SmsReceiver : BroadcastReceiver() {
             "Detection mode: $detectionMode"
         )
 
-        // MANUAL means SMS detection does not
-        // automatically create anything.
         if (detectionMode == MODE_MANUAL) {
 
             Log.d(
@@ -240,13 +267,18 @@ class SmsReceiver : BroadcastReceiver() {
 
         val sources =
             try {
-                settingsRepository.getSources(token)
+
+                settingsRepository
+                    .getSources(token)
+
             } catch (e: Exception) {
+
                 Log.e(
                     TAG,
                     "Failed to load transaction sources.",
                     e
                 )
+
                 return
             }
 
@@ -286,11 +318,9 @@ class SmsReceiver : BroadcastReceiver() {
                     return@firstOrNull false
                 }
 
-                // The built-in default SMS source has no sender IDs.
-                // In that case TREX accepts any SMS and the parser decides
-                // whether it is actually a transaction.
                 source.sender_ids.isEmpty() ||
                         source.sender_ids.any { senderId ->
+
                             senderMatches(
                                 smsSender = normalizedSender,
                                 configuredSender = senderId
@@ -395,7 +425,11 @@ class SmsReceiver : BroadcastReceiver() {
 
         Log.d(
             TAG,
-            "Date: ${parsedTransaction.dateTimeMillis}"
+            "Date/Time: ${
+                timestampToIsoString(
+                    parsedTransaction.dateTimeMillis
+                )
+            }"
         )
 
         Log.d(
@@ -498,10 +532,6 @@ class SmsReceiver : BroadcastReceiver() {
                 description =
                     parsedTransaction.description,
 
-                // Category is intentionally null.
-                //
-                // User will choose the category
-                // when approving the transaction.
                 category_id = null,
 
                 transaction_date =
@@ -515,6 +545,13 @@ class SmsReceiver : BroadcastReceiver() {
         Log.d(
             TAG,
             "Creating pending transaction..."
+        )
+
+        Log.d(
+            TAG,
+            "Pending date/time: ${
+                timestampToIsoString(timestamp)
+            }"
         )
 
         val repository =
@@ -561,16 +598,25 @@ class SmsReceiver : BroadcastReceiver() {
 
                 val notificationSettings =
                     try {
-                        SettingsRepository().getSettings(token)
+
+                        SettingsRepository()
+                            .getSettings(token)
+
                     } catch (_: Exception) {
+
                         null
                     }
 
-                if (notificationSettings?.notifications_enabled == true) {
+                if (
+                    notificationSettings
+                        ?.notifications_enabled == true
+                ) {
+
                     TransactionNotificationHelper.show(
                         context = context,
                         title = "Transaction detected",
-                        text = "₹${parsedTransaction.amount.toPlainString()} detected from SMS. Open TREX to review."
+                        text =
+                            "₹${parsedTransaction.amount.toPlainString()} detected from SMS. Open TREX to review."
                     )
                 }
 
@@ -611,7 +657,10 @@ class SmsReceiver : BroadcastReceiver() {
             "AUTO mode selected."
         )
 
-        // 1. Fetch categories
+        // ==========================================
+        // 1. Get categories
+        // ==========================================
+
         val categoryRepository =
             CategoryRepository(tokenManager)
 
@@ -619,7 +668,9 @@ class SmsReceiver : BroadcastReceiver() {
             categoryRepository.getCategories()
 
         val categories =
-            categoriesResult.getOrNull() ?: emptyList()
+            categoriesResult
+                .getOrNull()
+                ?: emptyList()
 
         if (categories.isEmpty()) {
 
@@ -630,7 +681,7 @@ class SmsReceiver : BroadcastReceiver() {
 
             createPendingTransaction(
                 context = context,
-                    token = token,
+                token = token,
                 sourceId = sourceId,
                 appName = appName,
                 packageName = packageName,
@@ -643,7 +694,10 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
 
-        // 2. Find best category match
+        // ==========================================
+        // 2. Find category
+        // ==========================================
+
         val type =
             parsedTransaction.transactionType
 
@@ -655,6 +709,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val filteredCategories =
             categories.filter {
+
                 it.category_type.equals(
                     type,
                     ignoreCase = true
@@ -663,6 +718,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val category =
             filteredCategories.firstOrNull {
+
                 it.category_name.equals(
                     merchant,
                     ignoreCase = true
@@ -671,17 +727,20 @@ class SmsReceiver : BroadcastReceiver() {
                             it.category_name,
                             ignoreCase = true
                         )
-            } ?: filteredCategories.firstOrNull {
-                it.category_name.equals(
-                    "Other",
-                    ignoreCase = true
-                ) ||
-                        it.category_name.equals(
-                            "Uncategorized",
-                            ignoreCase = true
-                        )
-            } ?: filteredCategories.firstOrNull()
-            ?: categories.firstOrNull()
+            }
+                ?: filteredCategories.firstOrNull {
+
+                    it.category_name.equals(
+                        "Other",
+                        ignoreCase = true
+                    ) ||
+                            it.category_name.equals(
+                                "Uncategorized",
+                                ignoreCase = true
+                            )
+                }
+                ?: filteredCategories.firstOrNull()
+                ?: categories.firstOrNull()
 
         if (category == null) {
 
@@ -692,7 +751,7 @@ class SmsReceiver : BroadcastReceiver() {
 
             createPendingTransaction(
                 context = context,
-                    token = token,
+                token = token,
                 sourceId = sourceId,
                 appName = appName,
                 packageName = packageName,
@@ -710,10 +769,18 @@ class SmsReceiver : BroadcastReceiver() {
             "Selected category: ${category.category_name} (ID: ${category.id})"
         )
 
+        // ==========================================
         // 3. Create transaction
+        // ==========================================
+
         val transactionRepository =
             TransactionRepository(tokenManager)
 
+        /*
+         * IMPORTANT:
+         *
+         * This uses the local phone date/time.
+         */
         val isoString =
             timestampToIsoString(timestamp)
 
@@ -721,10 +788,12 @@ class SmsReceiver : BroadcastReceiver() {
             isoString.split("T")
 
         val date =
-            dateParts.getOrNull(0)
+            dateParts
+                .getOrNull(0)
 
         val time =
-            dateParts.getOrNull(1)?.removeSuffix("Z")
+            dateParts
+                .getOrNull(1)
 
         val transaction =
             Transaction(
@@ -742,22 +811,62 @@ class SmsReceiver : BroadcastReceiver() {
 
         Log.d(
             TAG,
-            "Creating transaction automatically..."
+            "======================================"
+        )
+
+        Log.d(
+            TAG,
+            "CREATING AUTO TRANSACTION"
+        )
+
+        Log.d(
+            TAG,
+            "Amount: ${transaction.amount}"
+        )
+
+        Log.d(
+            TAG,
+            "Type: ${transaction.transaction_type}"
+        )
+
+        Log.d(
+            TAG,
+            "Description: ${transaction.description}"
+        )
+
+        Log.d(
+            TAG,
+            "Date: ${transaction.transaction_date}"
+        )
+
+        Log.d(
+            TAG,
+            "Time: ${transaction.transaction_time}"
+        )
+
+        Log.d(
+            TAG,
+            "======================================"
         )
 
         val result =
-            transactionRepository.createTransaction(
-                transaction
-            )
+            transactionRepository
+                .createTransaction(transaction)
 
         result
             .onSuccess {
+
                 Log.d(
                     TAG,
                     "Transaction created automatically: ${it.id}"
                 )
+
+                // Notify HomeScreen that a new transaction
+                // has been successfully created.
+                DashboardRefreshManager.refresh()
             }
             .onFailure { error ->
+
                 Log.e(
                     TAG,
                     "Failed to create transaction automatically. Falling back to APPROVAL mode.",
@@ -797,13 +906,6 @@ class SmsReceiver : BroadcastReceiver() {
                     " "
                 )
 
-        /*
-         * We use the SMS timestamp rounded to the
-         * nearest minute. This helps prevent the
-         * same multipart/broadcast SMS from creating
-         * duplicate pending transactions.
-         */
-
         val roundedTimestamp =
             timestamp -
                     (timestamp % 60_000L)
@@ -824,16 +926,39 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     // ==========================================
-    // Timestamp
+    // SMS TIMESTAMP → LOCAL PHONE DATE/TIME
     // ==========================================
 
     private fun timestampToIsoString(
         timestamp: Long
     ): String {
 
-        return java.time.Instant
-            .ofEpochMilli(timestamp)
-            .toString()
+        /*
+         * IMPORTANT:
+         *
+         * Do NOT use:
+         *
+         * Instant.ofEpochMilli(timestamp).toString()
+         *
+         * because that returns UTC time.
+         *
+         * SimpleDateFormat uses the phone's default
+         * timezone, so an SMS received at 11:45 AM
+         * in India will remain 11:45 AM.
+         */
+
+        val formatter =
+            SimpleDateFormat(
+                "yyyy-MM-dd'T'HH:mm:ss",
+                Locale.getDefault()
+            )
+
+        formatter.timeZone =
+            java.util.TimeZone.getDefault()
+
+        return formatter.format(
+            Date(timestamp)
+        )
     }
 
     // ==========================================
@@ -847,8 +972,14 @@ class SmsReceiver : BroadcastReceiver() {
         return sender
             .trim()
             .uppercase()
-            .replace(" ", "")
-            .replace("-", "")
+            .replace(
+                " ",
+                ""
+            )
+            .replace(
+                "-",
+                ""
+            )
     }
 
     // ==========================================

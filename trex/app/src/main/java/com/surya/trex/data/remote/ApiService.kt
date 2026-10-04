@@ -1,6 +1,8 @@
 package com.surya.trex.data.remote
 
 import com.surya.trex.data.model.Category
+import com.surya.trex.data.model.CategoryCreateRequest
+import com.surya.trex.data.model.CategoryUpdateRequest
 import com.surya.trex.data.model.CategorySummary
 import com.surya.trex.data.model.DashboardSummary
 import com.surya.trex.data.model.PendingTransaction
@@ -48,14 +50,71 @@ interface ApiService {
 
 
     // ============================================================
-    // CATEGORIES
+    // UPDATE TRANSACTION
     // ============================================================
 
+    @PUT("transactions/{transactionId}")
+    suspend fun updateTransaction(
+        @Header("Authorization") token: String,
+        @Path("transactionId") transactionId: Int,
+        @Body request: TransactionCreateRequest
+    ): Response<Transaction>
+
+
+    // ============================================================
+    // DELETE TRANSACTION
+    // ============================================================
+
+    @DELETE("transactions/{transactionId}")
+    suspend fun deleteTransaction(
+        @Header("Authorization") token: String,
+        @Path("transactionId") transactionId: Int
+    ): Response<Unit>
+
+
+
+// ============================================================
+// CATEGORIES
+// ============================================================
+
+    // GET ALL CATEGORIES
     @GET("categories/")
     suspend fun getCategories(
         @Header("Authorization") token: String
     ): Response<List<Category>>
 
+
+    // CREATE CATEGORY
+    @POST("categories/")
+    suspend fun createCategory(
+        @Header("Authorization") token: String,
+        @Body request: CategoryCreateRequest
+    ): Response<Category>
+
+
+    // GET SINGLE CATEGORY
+    @GET("categories/{categoryId}")
+    suspend fun getCategory(
+        @Header("Authorization") token: String,
+        @Path("categoryId") categoryId: Int
+    ): Response<Category>
+
+
+    // UPDATE CATEGORY
+    @PUT("categories/{categoryId}")
+    suspend fun updateCategory(
+        @Header("Authorization") token: String,
+        @Path("categoryId") categoryId: Int,
+        @Body request: CategoryUpdateRequest
+    ): Response<Category>
+
+
+    // DELETE CATEGORY
+    @DELETE("categories/{categoryId}")
+    suspend fun deleteCategory(
+        @Header("Authorization") token: String,
+        @Path("categoryId") categoryId: Int
+    ): Response<Unit>
 
     // ============================================================
     // DASHBOARD

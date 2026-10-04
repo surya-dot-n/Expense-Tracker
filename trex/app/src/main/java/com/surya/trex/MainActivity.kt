@@ -7,12 +7,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 import com.surya.trex.data.local.ThemeManager
 import com.surya.trex.data.local.TokenManager
+import com.surya.trex.data.model.Transaction
+import com.surya.trex.data.repository.DashboardRefreshManager
+
 import com.surya.trex.ui.auth.LoginScreen
+import com.surya.trex.ui.category.CategoryScreen
+import com.surya.trex.ui.category.CategoryViewModel
+import com.surya.trex.ui.category.CategoryViewModelFactory
 import com.surya.trex.ui.home.HomeScreen
 import com.surya.trex.ui.pending.PendingTransactionsScreen
 import com.surya.trex.ui.profile.ProfileScreen
@@ -28,13 +35,34 @@ class MainActivity : ComponentActivity() {
     private lateinit var tokenManager: TokenManager
     private lateinit var themeManager: ThemeManager
 
-    private var isLoggedIn = mutableStateOf(false)
+    private var isLoggedIn =
+        mutableStateOf(false)
 
-    private var currentScreen = mutableStateOf(Screen.HOME)
+    private var currentScreen =
+        mutableStateOf(Screen.HOME)
 
-    private var homeRefreshKey = mutableStateOf(0)
+    private var selectedTheme =
+        mutableStateOf("SYSTEM")
 
-    private var selectedTheme = mutableStateOf("SYSTEM")
+
+    // =====================================================
+    // Transaction being edited
+    // =====================================================
+
+    private var editingTransaction =
+        mutableStateOf<Transaction?>(null)
+
+
+    // =====================================================
+    // Category refresh
+    //
+    // Whenever CategoryScreen is closed after CRUD,
+    // this value increases and AddTransactionScreen
+    // reloads categories.
+    // =====================================================
+
+    private var categoryRefreshKey =
+        mutableIntStateOf(0)
 
 
     override fun onCreate(
@@ -46,52 +74,75 @@ class MainActivity : ComponentActivity() {
         // Initialize managers
         // -----------------------------------------
 
-        tokenManager = TokenManager(this)
+        tokenManager =
+            TokenManager(this)
 
-        themeManager = ThemeManager(this)
+        themeManager =
+            ThemeManager(this)
 
+
+        // -----------------------------------------
         // Load saved theme
-        selectedTheme.value = themeManager.getTheme()
+        // -----------------------------------------
 
+        selectedTheme.value =
+            themeManager.getTheme()
+
+
+        // -----------------------------------------
         // Check login state
+        // -----------------------------------------
+
         isLoggedIn.value =
             tokenManager.getToken() != null
 
+
+        // -----------------------------------------
         // Handle OAuth callback
+        // -----------------------------------------
+
         handleOAuthCallback(intent)
 
         enableEdgeToEdge()
 
 
-        // -----------------------------------------
+        // =================================================
         // Compose UI
-        // -----------------------------------------
+        // =================================================
 
         setContent {
 
             TrexTheme(
-                darkTheme = when (selectedTheme.value) {
 
-                    "DARK" -> true
+                darkTheme =
+                    when (selectedTheme.value) {
 
-                    "LIGHT" -> false
+                        "DARK" ->
+                            true
 
-                    else -> isSystemInDarkTheme()
-                }
+                        "LIGHT" ->
+                            false
+
+                        else ->
+                            isSystemInDarkTheme()
+                    }
             ) {
 
-                // -----------------------------------------
+                // =================================================
                 // LOGIN
-                // -----------------------------------------
+                // =================================================
 
                 if (!isLoggedIn.value) {
 
                     LoginScreen(
-                        viewModel = viewModel(),
+
+                        viewModel =
+                            viewModel(),
 
                         onLoginSuccess = {
 
-                            isLoggedIn.value = true
+                            isLoggedIn.value =
+                                true
 
                             currentScreen.value =
                                 Screen.HOME
@@ -100,69 +151,67 @@ class MainActivity : ComponentActivity() {
 
                 } else {
 
-                    // -----------------------------------------
+                    // =================================================
                     // MAIN NAVIGATION
-                    // -----------------------------------------
+                    // =================================================
 
                     when (currentScreen.value) {
 
-                        // =====================================
+                        // =============================================
                         // HOME
-                        // =====================================
+                        // =============================================
 
                         Screen.HOME -> {
 
-                            androidx.compose.runtime.key(
-                                homeRefreshKey.value
-                            ) {
+                            HomeScreen(
 
-                                HomeScreen(
+                                tokenManager =
+                                    tokenManager,
 
-                                    tokenManager =
-                                        tokenManager,
+                                onLogout = {
 
-                                    onLogout = {
+                                    tokenManager.clearToken()
 
-                                        tokenManager.clearToken()
+                                    isLoggedIn.value =
+                                        false
 
-                                        isLoggedIn.value =
-                                            false
+                                    currentScreen.value =
+                                        Screen.HOME
+                                },
 
-                                        currentScreen.value =
-                                            Screen.HOME
-                                    },
+                                onAddTransaction = {
 
-                                    onAddTransaction = {
+                                    editingTransaction.value =
+                                        null
 
-                                        currentScreen.value =
-                                            Screen.ADD_TRANSACTION
-                                    },
+                                    currentScreen.value =
+                                        Screen.ADD_TRANSACTION
+                                },
 
-                                    onViewTransactions = {
+                                onViewTransactions = {
 
-                                        currentScreen.value =
-                                            Screen.TRANSACTIONS
-                                    },
+                                    currentScreen.value =
+                                        Screen.TRANSACTIONS
+                                },
 
-                                    onProfileClick = {
+                                onProfileClick = {
 
-                                        currentScreen.value =
-                                            Screen.PROFILE
-                                    },
+                                    currentScreen.value =
+                                        Screen.PROFILE
+                                },
 
-                                    onPendingTransactions = {
+                                onPendingTransactions = {
 
-                                        currentScreen.value =
-                                            Screen.PENDING_TRANSACTIONS
-                                    }
-                                )
-                            }
+                                    currentScreen.value =
+                                        Screen.PENDING_TRANSACTIONS
+                                }
+                            )
                         }
 
 
-                        // =====================================
-                        // ADD TRANSACTION
-                        // =====================================
+                        // =============================================
+                        // ADD / EDIT TRANSACTION
+                        // =============================================
 
                         Screen.ADD_TRANSACTION -> {
 
@@ -171,20 +220,56 @@ class MainActivity : ComponentActivity() {
                                 tokenManager =
                                     tokenManager,
 
-                                onBack = {
+                                transaction =
+                                    editingTransaction.value,
+
+                                categoryRefreshKey =
+                                    categoryRefreshKey.intValue,
+
+                                onManageCategories = {
 
                                     currentScreen.value =
-                                        Screen.HOME
+                                        Screen.CATEGORY
+                                },
 
-                                    homeRefreshKey.value++
+                                onBack = {
+
+                                    if (
+                                        editingTransaction.value != null
+                                    ) {
+
+                                        editingTransaction.value =
+                                            null
+
+                                        currentScreen.value =
+                                            Screen.TRANSACTIONS
+
+                                    } else {
+
+                                        DashboardRefreshManager.refresh()
+
+                                        currentScreen.value =
+                                            Screen.HOME
+                                    }
+                                },
+
+                                onEditSaved = {
+
+                                    DashboardRefreshManager.refresh()
+
+                                    editingTransaction.value =
+                                        null
+
+                                    currentScreen.value =
+                                        Screen.TRANSACTIONS
                                 }
                             )
                         }
 
 
-                        // =====================================
+                        // =============================================
                         // TRANSACTIONS
-                        // =====================================
+                        // =============================================
 
                         Screen.TRANSACTIONS -> {
 
@@ -195,16 +280,27 @@ class MainActivity : ComponentActivity() {
 
                                 onBack = {
 
+                                    DashboardRefreshManager.refresh()
+
                                     currentScreen.value =
                                         Screen.HOME
+                                },
+
+                                onEditTransaction = { transaction ->
+
+                                    editingTransaction.value =
+                                        transaction
+
+                                    currentScreen.value =
+                                        Screen.ADD_TRANSACTION
                                 }
                             )
                         }
 
 
-                        // =====================================
+                        // =============================================
                         // PROFILE
-                        // =====================================
+                        // =============================================
 
                         Screen.PROFILE -> {
 
@@ -256,9 +352,9 @@ class MainActivity : ComponentActivity() {
                         }
 
 
-                        // =====================================
+                        // =============================================
                         // SETTINGS
-                        // =====================================
+                        // =============================================
 
                         Screen.SETTINGS -> {
 
@@ -273,9 +369,45 @@ class MainActivity : ComponentActivity() {
                         }
 
 
-                        // =====================================
+                        // =============================================
+                        // CATEGORY MANAGEMENT
+                        // =============================================
+
+                        Screen.CATEGORY -> {
+
+                            val categoryViewModel:
+                                    CategoryViewModel =
+                                viewModel(
+                                    factory =
+                                        CategoryViewModelFactory(
+                                            tokenManager
+                                        )
+                                )
+
+                            CategoryScreen(
+
+                                viewModel =
+                                    categoryViewModel,
+
+                                onBack = {
+
+                                    // ---------------------------------
+                                    // Tell AddTransactionScreen that
+                                    // categories changed.
+                                    // ---------------------------------
+
+                                    categoryRefreshKey.intValue++
+
+                                    currentScreen.value =
+                                        Screen.ADD_TRANSACTION
+                                }
+                            )
+                        }
+
+
+                        // =============================================
                         // PENDING TRANSACTIONS
-                        // =====================================
+                        // =============================================
 
                         Screen.PENDING_TRANSACTIONS -> {
 
@@ -286,12 +418,10 @@ class MainActivity : ComponentActivity() {
 
                                 onBack = {
 
+                                    DashboardRefreshManager.refresh()
+
                                     currentScreen.value =
                                         Screen.HOME
-
-                                    // Refresh dashboard after
-                                    // approving/denying transactions
-                                    homeRefreshKey.value++
                                 }
                             )
                         }
@@ -309,6 +439,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(
         intent: Intent
     ) {
+
         super.onNewIntent(intent)
 
         setIntent(intent)
@@ -325,8 +456,10 @@ class MainActivity : ComponentActivity() {
         intent: Intent?
     ) {
 
-        val uri = intent?.data
-            ?: return
+        val uri =
+            intent?.data
+                ?: return
+
 
         if (
             uri.scheme == "trex" &&
@@ -337,21 +470,22 @@ class MainActivity : ComponentActivity() {
             val token =
                 uri.getQueryParameter("token")
 
+
             if (!token.isNullOrEmpty()) {
 
-                // Save JWT
                 tokenManager.saveToken(token)
 
-                // Update login state
-                isLoggedIn.value = true
+                isLoggedIn.value =
+                    true
 
-                // Open Home
                 currentScreen.value =
                     Screen.HOME
+
 
                 println(
                     "OAuth login Successful"
                 )
+
 
                 println(
                     "JWT received and saved"
@@ -377,6 +511,8 @@ private enum class Screen {
     PROFILE,
 
     SETTINGS,
+
+    CATEGORY,
 
     PENDING_TRANSACTIONS
 }

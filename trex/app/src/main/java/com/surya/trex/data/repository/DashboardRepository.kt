@@ -10,111 +10,125 @@ class DashboardRepository(
     private val tokenManager: TokenManager
 ) {
 
-    suspend fun getDashboardSummary(): Result<DashboardSummary> {
+    /**
+     * Builds dashboard data from the same /transactions/ endpoint used by
+     * the Transactions screen.
+     *
+     * This keeps dashboard totals consistent with the transaction list and
+     * avoids depending on a server-side dashboard aggregation that may use
+     * different filtering/casing rules.
+     */
+    private suspend fun getAllTransactions() =
+        RetrofitClient.apiService.getTransactions(
+            token = "Bearer ${tokenManager.getToken().orEmpty()}"
+        )
 
+    private suspend fun getCategories() =
+        RetrofitClient.apiService.getCategories(
+            token = "Bearer ${tokenManager.getToken().orEmpty()}"
+        )
+
+    private fun <T> authCheck(
+        block: suspend () -> retrofit2.Response<T>
+    ): suspend () -> Result<T> = {
         val token = tokenManager.getToken()
-
-        if (token.isNullOrEmpty()) {
-            return Result.failure(
-                Exception("User is not logged in")
-            )
-        }
-
-        return try {
-
-            val response =
-                RetrofitClient.apiService.getDashboardSummary(
-                    token = "Bearer $token"
-                )
-
-            if (response.isSuccessful && response.body() != null) {
-
-                Result.success(response.body()!!)
-
-            } else {
-
-                Result.failure(
-                    Exception(
-                        "Failed: ${response.code()} ${response.message()}"
+        if (token.isNullOrBlank()) {
+            Result.failure(Exception("User is not logged in"))
+        } else {
+            try {
+                val response = block()
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!)
+                } else {
+                    Result.failure(
+                        Exception(
+                            "Failed: ${response.code()} ${response.message()}"
+                        )
                     )
-                )
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
             }
+        }
+    }
 
-        } catch (e: Exception) {
+    suspend fun getDashboardSummary(): Result<DashboardSummary> {
+        val result = authCheck { getAllTransactions() }()
+        return result.map { transactions ->
+            val income = transactions
+                .filter { it.transaction_type.equals("income", ignoreCase = true) }
+                .sumOf { it.amount }
 
-            Result.failure(e)
+            val expense = transactions
+                .filter { it.transaction_type.equals("expense", ignoreCase = true) }
+                .sumOf { it.amount }
+
+            DashboardSummary(
+                total_income = income,
+                total_expense = expense,
+                balance = income - expense
+            )
         }
     }
 
     suspend fun getDashboardCategories(): Result<List<CategorySummary>> {
-
-        val token = tokenManager.getToken()
-
-        if (token.isNullOrEmpty()) {
-            return Result.failure(
-                Exception("User is not logged in")
-            )
+        val transactionsResult = authCheck { getAllTransactions() }()
+        if (transactionsResult.isFailure) {
+            return Result.failure(transactionsResult.exceptionOrNull()!!)
         }
 
-        return try {
+        val categoriesResult = authCheck { getCategories() }()
+        if (categoriesResult.isFailure) {
+            return Result.failure(categoriesResult.exceptionOrNull()!!)
+        }
 
-            val response =
-                RetrofitClient.apiService.getDashboardCategories(
-                    token = "Bearer $token"
-                )
+        val transactions = transactionsResult.getOrThrow()
+        val categories = categoriesResult.getOrThrow()
 
-            if (response.isSuccessful && response.body() != null) {
+        val categoryNames = categories.associateBy { it.id }
 
-                Result.success(response.body()!!)
-
-            } else {
-
-                Result.failure(
-                    Exception(
-                        "Failed: ${response.code()} ${response.message()}"
-                    )
+        val result = transactions
+            .asSequence()
+            .filter {
+                it.transaction_type.equals("expense", ignoreCase = true)
+            }
+            .groupBy { it.category_id }
+            .map { (categoryId, items) ->
+                CategorySummary(
+                    category_id = categoryId,
+                    category_name =
+                        categoryNames[categoryId]?.category_name
+                            ?: "Other",
+                    total_amount = items.sumOf { it.amount }
                 )
             }
+            .sortedByDescending { it.total_amount }
 
-        } catch (e: Exception) {
-
-            Result.failure(e)
-        }
+        return Result.success(result)
     }
 
     suspend fun getRecentTransactions(): Result<List<RecentTransaction>> {
+        val result = authCheck { getAllTransactions() }()
 
-        val token = tokenManager.getToken()
-
-        if (token.isNullOrEmpty()) {
-            return Result.failure(
-                Exception("User is not logged in")
-            )
-        }
-
-        return try {
-
-            val response =
-                RetrofitClient.apiService.getRecentTransactions(
-                    token = "Bearer $token"
+        return result.map { transactions ->
+            transactions
+                .sortedWith(
+                    compareByDescending<com.surya.trex.data.model.Transaction> {
+                        it.transaction_date.orEmpty()
+                    }.thenByDescending {
+                        it.transaction_time.orEmpty()
+                    }
                 )
-
-            if (response.isSuccessful && response.body() != null) {
-
-                Result.success(response.body()!!)
-
-            } else {
-
-                Result.failure(
-                    Exception(
-                        "Failed: ${response.code()} ${response.message()}"
+                .take(5)
+                .map { transaction ->
+                    RecentTransaction(
+                        id = transaction.id ?: 0,
+                        category_id = transaction.category_id,
+                        amount = transaction.amount,
+                        description = transaction.description,
+                        transaction_type = transaction.transaction_type.lowercase()
                     )
-                )
-            }
-
-        } catch (e: Exception) {
-
-            Result.failure(e)
+                }
         }
     }
 }

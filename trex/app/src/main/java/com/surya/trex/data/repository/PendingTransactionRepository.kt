@@ -49,10 +49,18 @@ class PendingTransactionRepository {
     ): Result<PendingTransaction> {
 
         return try {
+            val normalizedRequest =
+                request.copy(
+                    transaction_type =
+                        request.transaction_type
+                            .trim()
+                            .lowercase()
+                )
+
             val response =
                 apiService.createPendingTransaction(
                     token = "Bearer $token",
-                    request = request
+                    request = normalizedRequest
                 )
 
             if (response.isSuccessful) {

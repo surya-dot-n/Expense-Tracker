@@ -54,9 +54,9 @@ fun LoginScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFEEF4FF),
-                        Color(0xFFF8FAFF),
-                        Color(0xFFFFFFFF)
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface
                     )
                 )
             )
@@ -68,7 +68,7 @@ fun LoginScreen(
             modifier = Modifier
                 .size(180.dp)
                 .clip(CircleShape)
-                .background(Color(0x332F80ED))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.20f))
                 .align(Alignment.TopEnd)
         )
 
@@ -76,7 +76,7 @@ fun LoginScreen(
             modifier = Modifier
                 .size(130.dp)
                 .clip(CircleShape)
-                .background(Color(0x2218B979))
+                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.13f))
                 .align(Alignment.BottomStart)
         )
 
@@ -96,7 +96,7 @@ fun LoginScreen(
             Surface(
                 modifier = Modifier.size(82.dp),
                 shape = RoundedCornerShape(26.dp),
-                color = Color(0xFF2563EB),
+                color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 10.dp
             ) {
                 Box(
@@ -105,7 +105,7 @@ fun LoginScreen(
                     Icon(
                         imageVector = Icons.Default.AccountBalanceWallet,
                         contentDescription = "Trex",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(42.dp)
                     )
                 }
@@ -120,7 +120,7 @@ fun LoginScreen(
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 5.sp,
-                color = Color(0xFF172554)
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -129,7 +129,7 @@ fun LoginScreen(
                 text = "Smart Expense Tracker",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF64748B)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -142,7 +142,7 @@ fun LoginScreen(
                 lineHeight = 38.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                color = Color(0xFF0F172A)
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -152,7 +152,7 @@ fun LoginScreen(
                 fontSize = 15.sp,
                 lineHeight = 22.sp,
                 textAlign = TextAlign.Center,
-                color = Color(0xFF64748B)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -163,7 +163,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
                 elevation = CardDefaults.cardElevation(
                     defaultElevation = 5.dp
@@ -208,7 +208,7 @@ fun LoginScreen(
                     val intent = Intent(
                         Intent.ACTION_VIEW,
                         Uri.parse(
-                            "https://near-measuring-ist-merry.trycloudflare.com/auth/google"
+                            "https://trex-backend-6yna.onrender.com/auth/google"
                         )
                     )
 
@@ -219,8 +219,8 @@ fun LoginScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(17.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2563EB),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 elevation = ButtonDefaults.buttonElevation(
                     defaultElevation = 5.dp
@@ -245,7 +245,7 @@ fun LoginScreen(
                 Icon(
                     imageVector = Icons.Default.Security,
                     contentDescription = null,
-                    tint = Color(0xFF16A34A),
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(16.dp)
                 )
 
@@ -254,7 +254,7 @@ fun LoginScreen(
                 Text(
                     text = "Secure sign-in with Google",
                     fontSize = 12.sp,
-                    color = Color(0xFF64748B)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -264,7 +264,7 @@ fun LoginScreen(
                 text = "Your finances. Your control. Your future.",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF94A3B8),
+                color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center
             )
         }
@@ -285,7 +285,7 @@ private fun LoginFeature(
         Surface(
             modifier = Modifier.size(42.dp),
             shape = CircleShape,
-            color = Color(0xFFEFF6FF)
+            color = MaterialTheme.colorScheme.primaryContainer
         ) {
 
             Box(
@@ -295,7 +295,7 @@ private fun LoginFeature(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = Color(0xFF2563EB),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -307,7 +307,7 @@ private fun LoginFeature(
             text = text,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF475569)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

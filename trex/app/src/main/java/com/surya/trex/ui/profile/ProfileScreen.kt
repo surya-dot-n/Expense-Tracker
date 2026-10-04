@@ -117,11 +117,12 @@ fun ProfileScreen(
     // ==================================================
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                MaterialTheme.colorScheme.background
-            )
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    MaterialTheme.colorScheme.background
+                )
     ) {
 
         // ==================================================
@@ -129,12 +130,13 @@ fun ProfileScreen(
         // ==================================================
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = 12.dp,
-                    vertical = 8.dp
-                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 12.dp,
+                        vertical = 8.dp
+                    ),
 
             verticalAlignment =
                 Alignment.CenterVertically
@@ -149,7 +151,12 @@ fun ProfileScreen(
                         Icons.Default.ArrowBack,
 
                     contentDescription =
-                        "Back"
+                        "Back",
+
+                    tint =
+                        MaterialTheme
+                            .colorScheme
+                            .onBackground
                 )
             }
 
@@ -162,7 +169,12 @@ fun ProfileScreen(
                         .titleLarge,
 
                 fontWeight =
-                    FontWeight.Bold
+                    FontWeight.Bold,
+
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onBackground
             )
         }
 
@@ -183,7 +195,12 @@ fun ProfileScreen(
                     Alignment.Center
             ) {
 
-                CircularProgressIndicator()
+                CircularProgressIndicator(
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .primary
+                )
             }
 
         }
@@ -224,7 +241,12 @@ fun ProfileScreen(
                                 .titleMedium,
 
                         fontWeight =
-                            FontWeight.Bold
+                            FontWeight.Bold,
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onBackground
                     )
 
                     Spacer(
@@ -309,7 +331,7 @@ fun ProfileScreen(
                             .background(
                                 MaterialTheme
                                     .colorScheme
-                                    .primaryContainer
+                                    .primary
                             ),
 
                     contentAlignment =
@@ -329,7 +351,12 @@ fun ProfileScreen(
                                 .headlineLarge,
 
                         fontWeight =
-                            FontWeight.Bold
+                            FontWeight.Bold,
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onPrimary
                     )
                 }
 
@@ -354,13 +381,23 @@ fun ProfileScreen(
                             .headlineSmall,
 
                     fontWeight =
-                        FontWeight.Bold
+                        FontWeight.Bold,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onBackground
                 )
 
 
                 // ==================================================
                 // USER EMAIL
                 // ==================================================
+
+                Spacer(
+                    modifier =
+                        Modifier.height(4.dp)
+                )
 
                 Text(
                     text =
@@ -401,7 +438,12 @@ fun ProfileScreen(
                             .titleMedium,
 
                     fontWeight =
-                        FontWeight.Bold
+                        FontWeight.Bold,
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onBackground
                 )
 
 
@@ -432,10 +474,28 @@ fun ProfileScreen(
 
                         label = {
 
-                            Text("Name")
+                            Text(
+                                text = "Name",
+
+                                color =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .onSurfaceVariant
+                            )
                         },
 
                         singleLine = true,
+
+                        textStyle =
+                            MaterialTheme
+                                .typography
+                                .bodyLarge
+                                .copy(
+                                    color =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurface
+                                ),
 
                         trailingIcon = {
 
@@ -444,9 +504,54 @@ fun ProfileScreen(
                                     Icons.Default.Edit,
 
                                 contentDescription =
-                                    "Edit name"
+                                    "Edit name",
+
+                                tint =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .primary
                             )
-                        }
+                        },
+
+                        colors =
+                            androidx.compose.material3
+                                .OutlinedTextFieldDefaults
+                                .colors(
+                                    focusedBorderColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .primary,
+
+                                    unfocusedBorderColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .outline,
+
+                                    focusedLabelColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .primary,
+
+                                    unfocusedLabelColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurfaceVariant,
+
+                                    cursorColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .primary,
+
+                                    focusedTextColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurface,
+
+                                    unfocusedTextColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurface
+                                )
                     )
 
 
@@ -467,12 +572,30 @@ fun ProfileScreen(
 
                         label = {
 
-                            Text("Email")
+                            Text(
+                                text = "Email",
+
+                                color =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .onSurfaceVariant
+                            )
                         },
 
                         singleLine = true,
 
                         readOnly = true,
+
+                        textStyle =
+                            MaterialTheme
+                                .typography
+                                .bodyLarge
+                                .copy(
+                                    color =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurface
+                                ),
 
                         trailingIcon = {
 
@@ -481,9 +604,54 @@ fun ProfileScreen(
                                     Icons.Default.Lock,
 
                                 contentDescription =
-                                    "Email cannot be changed"
+                                    "Email cannot be changed",
+
+                                tint =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .onSurfaceVariant
                             )
-                        }
+                        },
+
+                        colors =
+                            androidx.compose.material3
+                                .OutlinedTextFieldDefaults
+                                .colors(
+                                    focusedBorderColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .outline,
+
+                                    unfocusedBorderColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .outline,
+
+                                    focusedLabelColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurfaceVariant,
+
+                                    unfocusedLabelColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurfaceVariant,
+
+                                    focusedTextColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurface,
+
+                                    unfocusedTextColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurface,
+
+                                    disabledTextColor =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onSurface
+                                )
                     )
 
 
@@ -514,7 +682,14 @@ fun ProfileScreen(
                             }
                         ) {
 
-                            Text("Cancel")
+                            Text(
+                                text = "Cancel",
+
+                                color =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .onSurfaceVariant
+                            )
                         }
 
 
@@ -540,12 +715,19 @@ fun ProfileScreen(
                                     modifier =
                                         Modifier.size(18.dp),
 
-                                    strokeWidth = 2.dp
+                                    strokeWidth = 2.dp,
+
+                                    color =
+                                        MaterialTheme
+                                            .colorScheme
+                                            .onPrimary
                                 )
 
                             } else {
 
-                                Text("Save")
+                                Text(
+                                    text = "Save"
+                                )
                             }
                         }
                     }
@@ -605,7 +787,16 @@ fun ProfileScreen(
                 )
 
 
-                HorizontalDivider()
+                // ==================================================
+                // DIVIDER
+                // ==================================================
+
+                HorizontalDivider(
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .outlineVariant
+                )
 
 
                 Spacer(
@@ -626,7 +817,12 @@ fun ProfileScreen(
                                 Icons.Default.Palette,
 
                             contentDescription =
-                                "Theme"
+                                "Theme",
+
+                            tint =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary
                         )
                     },
 
@@ -653,7 +849,12 @@ fun ProfileScreen(
                                 Icons.Default.Settings,
 
                             contentDescription =
-                                "Settings"
+                                "Settings",
+
+                            tint =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary
                         )
                     },
 
@@ -683,10 +884,30 @@ fun ProfileScreen(
                         Modifier.fillMaxWidth(),
 
                     shape =
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(12.dp),
+
+                    colors =
+                        androidx.compose.material3
+                            .ButtonDefaults
+                            .buttonColors(
+                                containerColor =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .primary,
+
+                                contentColor =
+                                    MaterialTheme
+                                        .colorScheme
+                                        .onPrimary
+                            )
                 ) {
 
-                    Text("Logout")
+                    Text(
+                        text = "Logout",
+
+                        fontWeight =
+                            FontWeight.Bold
+                    )
                 }
 
 
@@ -739,7 +960,12 @@ fun ProfileScreen(
 
                 Text(
                     text =
-                        "Choose Theme"
+                        "Choose Theme",
+
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurface
                 )
             },
 
@@ -815,7 +1041,14 @@ fun ProfileScreen(
                     }
                 ) {
 
-                    Text("Close")
+                    Text(
+                        text = "Close",
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .primary
+                    )
                 }
             }
         )
@@ -866,7 +1099,12 @@ private fun ThemeOption(
             style =
                 MaterialTheme
                     .typography
-                    .bodyLarge
+                    .bodyLarge,
+
+            color =
+                MaterialTheme
+                    .colorScheme
+                    .onSurface
         )
     }
 }
@@ -928,7 +1166,15 @@ private fun ProfileInfoRow(
                 style =
                     MaterialTheme
                         .typography
-                        .bodyLarge
+                        .bodyLarge,
+
+                fontWeight =
+                    FontWeight.Medium,
+
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurface
             )
         }
 
@@ -945,7 +1191,12 @@ private fun ProfileInfoRow(
                         Icons.Default.Edit,
 
                     contentDescription =
-                        "Edit $label"
+                        "Edit $label",
+
+                    tint =
+                        MaterialTheme
+                            .colorScheme
+                            .primary
                 )
             }
 
@@ -1015,7 +1266,15 @@ private fun ProfileMenuItem(
                 style =
                     MaterialTheme
                         .typography
-                        .bodyLarge
+                        .bodyLarge,
+
+                fontWeight =
+                    FontWeight.Medium,
+
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onBackground
             )
 
             Text(
@@ -1025,7 +1284,12 @@ private fun ProfileMenuItem(
                 style =
                     MaterialTheme
                         .typography
-                        .titleLarge
+                        .titleLarge,
+
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
             )
         }
     }
