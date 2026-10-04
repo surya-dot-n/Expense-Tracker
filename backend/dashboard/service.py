@@ -4,12 +4,18 @@ from sqlalchemy import func
 from models.transaction import Transaction
 from models.category import Category
 
+
 def get_dashboard_summary(
-        db: Session,
-        user_id: int
+    db: Session,
+    user_id: int
 ):
     total_income = (
-        db.query(func.coalesce(func.sum(Transaction.amount),0))
+        db.query(
+            func.coalesce(
+                func.sum(Transaction.amount),
+                0
+            )
+        )
         .filter(
             Transaction.user_id == user_id,
             Transaction.transaction_type == "income"
@@ -18,30 +24,39 @@ def get_dashboard_summary(
     )
 
     total_expense = (
-        db.query(func.coalesce(func.sum(Transaction.amount),0))
+        db.query(
+            func.coalesce(
+                func.sum(Transaction.amount),
+                0
+            )
+        )
         .filter(
             Transaction.user_id == user_id,
             Transaction.transaction_type == "expense"
-        ).scalar()
+        )
+        .scalar()
     )
 
     balance = total_income - total_expense
 
     return {
-        "total_income" : total_income,
-        "total_expense" : total_expense,
-        "balance" : balance
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "balance": balance
     }
 
+
 def get_category_summary(
-        db: Session,
-        user_id: int
+    db: Session,
+    user_id: int
 ):
     results = (
         db.query(
             Category.id,
             Category.category_name,
-            func.sum(Transaction.amount).label("total_amount")
+            func.sum(Transaction.amount).label(
+                "total_amount"
+            )
         )
         .join(
             Transaction,
@@ -64,18 +79,25 @@ def get_category_summary(
             "category_name": category_name,
             "total_amount": total_amount
         }
-        for category_id,category_name,total_amount in results
+        for category_id, category_name, total_amount in results
     ]
 
+
 def get_recent_transactions(
-        db: Session,
-        user_id: int,
-        limit: int = 5
+    db: Session,
+    user_id: int,
+    limit: int = 5
 ):
     return (
         db.query(Transaction)
-        .filter(Transaction.user_id == user_id)
-        .order_by(Transaction.created_at.desc())
+        .filter(
+            Transaction.user_id == user_id
+        )
+        .order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.transaction_time.desc(),
+            Transaction.created_at.desc()
+        )
         .limit(limit)
         .all()
     )
